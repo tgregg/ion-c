@@ -30,18 +30,18 @@
 #endif
 
 /**
- * Limit on the maximum length of any path. Sizes and indices are stored in a signed 8-bit integer, so this is the
+ * Limit on the maximum length of any path. Sizes and indices are stored in an unsigned 8-bit integer, so this is the
  * max value that can be represented.
  * NOTE: this is a constant that may not be redefined by the user.
  */
-#define ION_EXTRACTOR_MAX_PATH_LENGTH_LIMIT 127
+#define ION_EXTRACTOR_MAX_PATH_LENGTH_LIMIT UINT8_MAX
 
 /**
  * Limit on the maximum number of paths that can be registered to any extractor. Registered paths are assigned a bit
  * index in a length-64 bitmap.
  * NOTE: this is a constant that may not be redefined by the user.
  */
-#define ION_EXTRACTOR_MAX_NUM_PATHS_LIMIT 64
+#define ION_EXTRACTOR_MAX_NUM_PATHS_LIMIT (sizeof(uint_fast64_t))
 
 #ifdef ION_EXTRACTOR_MAX_PATH_LENGTH_DEFAULT
     #undef ION_EXTRACTOR_MAX_PATH_LENGTH_DEFAULT
@@ -107,16 +107,6 @@
     #endif
 #endif
 
-/**
- * Signals the extractor to step out N before resuming processing of paths.
- */
-#define ION_EXTRACTOR_CONTROL_STEP_OUT(n) (ION_EXTRACTOR_CONTROL)(n)
-
-/**
- * Signals the extractor to continue processing of paths without stepping out.
- */
-#define ION_EXTRACTOR_CONTROL_NEXT() (ION_EXTRACTOR_CONTROL_STEP_OUT(0))
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -132,7 +122,7 @@ typedef struct _ion_extractor_options {
      * The closer this value is to the length of the longest path registered to the extractor, the denser the paths can
      * be organized, which may improve performance.
      */
-    int8_t max_path_length;
+    uint8_t max_path_length;
 
     /**
      * The maximum number of paths that can be registered to this extractor. Defaults to ION_EXTRACTOR_MAX_NUM_PATHS,
@@ -141,7 +131,7 @@ typedef struct _ion_extractor_options {
      * The closer this value is to the actual number of paths provided to the extractor, the denser the paths can
      * be organized, which may improve performance.
      */
-    int8_t max_num_paths;
+    uint8_t max_num_paths;
 
 } ION_EXTRACTOR_OPTIONS;
 
@@ -158,12 +148,12 @@ typedef ION_EXTRACTOR *hEXTRACTOR;
 /**
  * The internal path structure.
  */
-typedef struct _ion_extractor_path ION_EXTRACTOR_PATH;
+typedef struct _ion_extractor_path_descriptor ION_EXTRACTOR_PATH_DESCRIPTOR;
 
 /**
- * Handle to an ION_EXTRACTOR_PATH.
+ * Handle to an ION_EXTRACTOR_PATH_DESCRIPTOR.
  */
-typedef ION_EXTRACTOR_PATH *hPATH;
+typedef ION_EXTRACTOR_PATH_DESCRIPTOR *hPATH;
 
 /**
  * An instruction used by callback implementations to control execution of the extractor after a match. In general,
@@ -176,6 +166,24 @@ typedef ION_EXTRACTOR_PATH *hPATH;
  *      without stepping out (i.e. step out 0).
  */
 typedef int_fast16_t ION_EXTRACTOR_CONTROL;
+
+/**
+ * Signals the extractor to step out N before resuming processing of paths.
+ */
+static inline ION_EXTRACTOR_CONTROL
+ion_extractor_control_step_out(int n)
+{
+    return (ION_EXTRACTOR_CONTROL) n;
+}
+
+/**
+ * Signals the extractor to continue processing of paths without stepping out.
+ */
+static inline ION_EXTRACTOR_CONTROL
+ion_extractor_control_next()
+{
+    return ion_extractor_control_step_out(0);
+}
 
 /**
  * Callback function to be invoked when the extractor matches a path.

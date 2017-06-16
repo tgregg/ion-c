@@ -26,10 +26,10 @@
  * A bit map representing matching paths at a particular path depth. If the bit at index N is set, it means the path
  * with ID = N is active. If zero, there are no paths active at this depth, and the extractor is free to skip and step
  * out.
- * NOTE: This is coupled to the ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS_LIMIT of 64: one bit for each possible
+ * NOTE: This is coupled to the ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS_LIMIT: one bit for each possible
  * path. Raising that limit (or making it configurable) will require a different strategy for tracking active paths.
  */
-typedef uint64_t ION_EXTRACTOR_ACTIVE_PATH_MAP;
+typedef uint_fast64_t ION_EXTRACTOR_ACTIVE_PATH_MAP;
 
 iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
     iENTER;
@@ -59,6 +59,14 @@ iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
     iRETURN;
 }
 
+iERR ion_extractor_close(hEXTRACTOR extractor) {
+    iENTER;
+    // Frees associated resources (namely, the copied field strings), then frees the extractor
+    // itself.
+    ion_free_owner(extractor);
+    iRETURN;
+}
+
 iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_CALLBACK callback, void *user_context) {
     iENTER;
     ION_EXTRACTOR_MATCHER *matcher;
@@ -74,14 +82,6 @@ iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_CALLB
     matcher->callback = callback;
     matcher->user_context = user_context;
 
-    iRETURN;
-}
-
-iERR ion_extractor_close(hEXTRACTOR extractor) {
-    iENTER;
-    // Frees associated resources (namely, the copied field strings), then frees the extractor
-    // itself.
-    ion_free_owner(extractor);
     iRETURN;
 }
 
@@ -135,9 +135,9 @@ iERR ion_extractor_register_path_append_wildcard(hEXTRACTOR extractor) {
     iRETURN;
 }
 
-iERR ion_extractor_register_path_finish(hEXTRACTOR extractor, ION_EXTRACTOR_PATH **p_path) {
+iERR ion_extractor_register_path_finish(hEXTRACTOR extractor, ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
     iENTER;
-    ION_EXTRACTOR_PATH *path;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
     ION_EXTRACTOR_PATH_COMPONENT *terminal_component;
     ASSERT(extractor->matchers_length >= 0 && extractor->matchers_length <= extractor->options.max_num_paths);
     ASSERT(p_path);
@@ -301,7 +301,7 @@ iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE 
     iENTER;
     ION_TYPE t;
     POSITION ordinal = 0;
-    ION_EXTRACTOR_CONTROL control = ION_EXTRACTOR_CONTROL_NEXT();
+    ION_EXTRACTOR_CONTROL control = ion_extractor_control_next();
     ION_EXTRACTOR_ACTIVE_PATH_MAP current_depth_actives;
 
     for (;;) {

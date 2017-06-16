@@ -91,7 +91,7 @@
  * Test-specific assertion function to be provided to the extractor within the user context. This can't be done directly
  * in the callback because gtest's assertions need to be invoked from a void function.
  */
-typedef void (*ASSERT_MATCHES)(ION_READER *reader, ION_EXTRACTOR_PATH *, ION_EXTRACTOR_PATH *, ION_EXTRACTOR_CONTROL *);
+typedef void (*ASSERT_MATCHES)(ION_READER *reader, ION_EXTRACTOR_PATH_DESCRIPTOR *, ION_EXTRACTOR_PATH_DESCRIPTOR *, ION_EXTRACTOR_CONTROL *);
 
 /**
  * Test-specific state to be provided to the extractor as user context. In addition to verifying that user context is
@@ -107,7 +107,7 @@ typedef struct _assertion_context {
  * Callback that can be used for path extractor tests. Treats user_context as an ASSERT_MATCHES function pointer,
  * and invokes that function.
  */
-iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
+iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
     iENTER;
     ASSERTION_CONTEXT *assertion_context = (ASSERTION_CONTEXT *)user_context;
     assertion_context->assertion(reader, matched_path, assertion_context->path, control);
@@ -115,7 +115,7 @@ iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH *matched_path, void *user_c
     iRETURN;
 }
 
-void assertMatchesByFieldAtDepth1(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesByFieldAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING value;
     ION_TYPE type;
 
@@ -152,7 +152,7 @@ TEST(IonExtractor, MatchesByFieldAtDepth1FromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
 }
 
-void assertMatchesByOrdinalAtDepth1(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesByOrdinalAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     // It happens to match the same field.
     assertMatchesByFieldAtDepth1(reader, matched_path, original_path, control);
 }
@@ -181,7 +181,7 @@ TEST(IonExtractor, MatchesByOrdinalAtDepth1FromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
 }
 
-void assertMatchesByFieldAndOrdinalAtDepth3(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesByFieldAndOrdinalAtDepth3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -232,7 +232,7 @@ TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIonAlternate) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
 }
 
-void assertMatchesByWildcard(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesByWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -285,7 +285,7 @@ TEST(IonExtractor, MatchesByWildcardWithFieldNameStar) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
 }
 
-void assertMatchesByNonTerminalWildcard(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesByNonTerminalWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -347,7 +347,7 @@ TEST(IonExtractor, MatchesMultiplePathsFromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
 }
 
-void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING str_value;
     int int_value;
     ION_TYPE type;
@@ -391,7 +391,7 @@ TEST(IonExtractor, MatchesSamePathMultipleTimesFromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
 }
 
-void assertDoesNotMatchPath(hREADER reader, ION_EXTRACTOR_PATH *matched_path, ION_EXTRACTOR_PATH *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertDoesNotMatchPath(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ASSERT_FALSE(TRUE) << "Path with ID " << matched_path->path_id << " matched when it should not have.";
 }
 

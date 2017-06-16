@@ -17,6 +17,7 @@
 
 #include "ion_internal.h"
 #include "ion_extractor.h"
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,16 +25,16 @@ extern "C" {
 
 /**
  * Represents indices and sizes for extractor-internal data.
- * NOTE: this can be a int8_t because both ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS and
+ * NOTE: this can be a uint8_t because both ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS and
  * ION_EXTRACTOR_DEFAULT_MAX_PATH_LENGTH can be represented in 8 bits. Raising these limits (or making them
  * configurable) will require a larger data type.
  */
-typedef int8_t ION_EXTRACTOR_SIZE;
+typedef uint8_t ION_EXTRACTOR_SIZE;
 
 /**
  * A path for the extractor to match.
  */
-struct _ion_extractor_path {
+struct _ion_extractor_path_descriptor {
     /**
      * A unique identifier for this path.
      */
@@ -83,7 +84,7 @@ typedef struct _ion_extractor_path_component {
      * matcher's path's length), but storing it may be cheaper, as calculating it would require accessing the matcher's
      * path's length in a disparate memory location each time a component is accessed.
      */
-    BYTE is_terminal;
+    bool is_terminal;
 
     /**
      * The type of the component: FIELD, ORDINAL, or WILDCARD.
@@ -110,7 +111,7 @@ typedef struct _ion_extractor_matcher {
     /**
      * The path to match.
      */
-    ION_EXTRACTOR_PATH path;
+    ION_EXTRACTOR_PATH_DESCRIPTOR path;
 
     /**
      * The callback to invoke when the path matches.
@@ -135,7 +136,7 @@ struct _ion_extractor {
      * TRUE if the user has started, but not finished, a path. When TRUE, the user cannot start another path or start
      * matching.
      */
-    BYTE _path_in_progress;
+    bool _path_in_progress;
 
     /**
      * The length of the current path. Only valid when `_path_in_progress` is TRUE.

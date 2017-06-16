@@ -35,7 +35,7 @@
 
 typedef iERR (*TEST_BENCHMARK_REGISTER)(hEXTRACTOR, int *);
 
-iERR test_sum_ints(hREADER reader, ION_EXTRACTOR_PATH *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
+iERR test_sum_ints(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
     iENTER;
     ION_TYPE type;
     int age;
@@ -48,7 +48,7 @@ iERR test_sum_ints(hREADER reader, ION_EXTRACTOR_PATH *matched_path, void *user_
     else {
         FAILWITH(IERR_INVALID_STATE);
     }
-    *control = ION_EXTRACTOR_CONTROL_NEXT();
+    *control = ion_extractor_control_next();
     iRETURN;
 }
 
