@@ -58,11 +58,10 @@ iERR test_benchmark_register_sum_age(hEXTRACTOR extractor, int *result) {
     ION_STRING field;
     //const char *path_ion = "($ion_wildcard::'*' age)";
     //ion_extractor_register_path_from_ion(extractor, &test_sum_ages, &ages_sum, (BYTE *)path_ion, (SIZE)strlen(path_ion), &path);
-    IONCHECK(ion_extractor_register_path_start(extractor, &test_sum_ints, result));
-    IONCHECK(ion_extractor_register_path_append_wildcard(extractor));
+    IONCHECK(ion_extractor_register_path_start(extractor, 2, &test_sum_ints, result, &path));
+    IONCHECK(ion_extractor_register_path_append_wildcard(path));
     IONCHECK(ion_string_from_cstr("age", &field));
-    IONCHECK(ion_extractor_register_path_append_field(extractor, &field));
-    IONCHECK(ion_extractor_register_path_finish(extractor, &path));
+    IONCHECK(ion_extractor_register_path_append_field(path, &field));
     iRETURN;
 }
 
@@ -71,10 +70,9 @@ iERR test_benchmark_register_sum_foo(hEXTRACTOR extractor, int *result) {
     hPATH path;
     ION_STRING field;
 
-    IONCHECK(ion_extractor_register_path_start(extractor, &test_sum_ints, result));
+    IONCHECK(ion_extractor_register_path_start(extractor, 1, &test_sum_ints, result, &path));
     IONCHECK(ion_string_from_cstr("foo", &field));
-    IONCHECK(ion_extractor_register_path_append_field(extractor, &field));
-    IONCHECK(ion_extractor_register_path_finish(extractor, &path));
+    IONCHECK(ion_extractor_register_path_append_field(path, &field));
     iRETURN;
 }
 
@@ -173,11 +171,10 @@ iERR test_benchmark_register_sum_foo_long(hEXTRACTOR extractor, int *result) {
     hPATH path;
     ION_STRING field;
 
-    IONCHECK(ion_extractor_register_path_start(extractor, &test_sum_ints, result));
-    IONCHECK(ion_extractor_register_path_append_wildcard(extractor));
+    IONCHECK(ion_extractor_register_path_start(extractor, 2, &test_sum_ints, result, &path));
+    IONCHECK(ion_extractor_register_path_append_wildcard(path));
     IONCHECK(ion_string_from_cstr("foo", &field));
-    IONCHECK(ion_extractor_register_path_append_field(extractor, &field));
-    IONCHECK(ion_extractor_register_path_finish(extractor, &path));
+    IONCHECK(ion_extractor_register_path_append_field(path, &field));
     iRETURN;
 }
 

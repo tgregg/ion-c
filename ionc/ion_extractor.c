@@ -61,32 +61,31 @@ iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
 
 iERR ion_extractor_close(hEXTRACTOR extractor) {
     iENTER;
-    // Frees associated resources (namely, the copied field strings), then frees the extractor
+    // Frees associated resources (path descriptors, copied field strings), then frees the extractor
     // itself.
     ion_free_owner(extractor);
     iRETURN;
 }
 
-iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length, ION_EXTRACTOR_CALLBACK callback, void *user_context, ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
+iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length, ION_EXTRACTOR_CALLBACK callback, void *user_context, ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
     iENTER;
     ION_EXTRACTOR_MATCHER *matcher;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
 
-    if (!path) {
-        FAILWITHMSG(IERR_INVALID_ARG, "Path must not be null.");
-    }
+    ASSERT(p_path);
+
     if (extractor->matchers_length >= extractor->options.max_num_paths) {
         FAILWITHMSG(IERR_NO_MEMORY, "Too many registered paths.");
     }
     if (extractor->_path_in_progress || extractor->_cur_path_len != 0) {
         FAILWITHMSG(IERR_INVALID_STATE, "Cannot start new path before finishing the previous one.");
     }
-    //if (path->extractor) {
-    //    FAILWITHMSG(IERR_INVALID_STATE, "Cannot start a path that has previously been started.");
-    //}
     if (path_length > extractor->options.max_path_length || path_length <= 0) {
         FAILWITHMSG(IERR_INVALID_ARG, "Illegal number of path components.");
     }
-    extractor->_path_in_progress = TRUE;
+    // This will be freed by ion_free_owner during ion_extractor_close.
+    path = ion_alloc_with_owner(extractor, sizeof(ION_EXTRACTOR_PATH_DESCRIPTOR));
+    extractor->_path_in_progress = true;
     path->path_length = path_length;
     path->path_id = extractor->matchers_length;
     path->extractor = extractor;
@@ -94,6 +93,7 @@ iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE 
     matcher->callback = callback;
     matcher->user_context = user_context;
     matcher->path = path;
+    *p_path = path;
 
     iRETURN;
 }
@@ -117,7 +117,7 @@ iERR _ion_extractor_path_append_helper(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_
     component = ION_EXTRACTOR_GET_COMPONENT(extractor, extractor->_cur_path_len, extractor->matchers_length);
     component->is_terminal = (++extractor->_cur_path_len == path->path_length);
     if (component->is_terminal) {
-        extractor->_path_in_progress = FALSE;
+        extractor->_path_in_progress = false;
         extractor->_cur_path_len = 0;
         extractor->matchers_length++;
     }
@@ -156,7 +156,7 @@ iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *
 
 iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_CALLBACK callback,
                                           void *user_context, BYTE *ion_data, SIZE ion_data_length,
-                                          ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
+                                          ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
     iENTER;
     ION_READER *reader = NULL;
     ION_READER_OPTIONS options;
@@ -165,6 +165,9 @@ iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_C
     BOOL has_annotations;
     ION_EXTRACTOR_PATH_COMPONENT components[ION_EXTRACTOR_MAX_PATH_LENGTH], *component;
     ION_EXTRACTOR_SIZE path_length = 0, i;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
+
+    ASSERT(p_path);
 
     wildcard_annotation.value = (BYTE *)ION_EXTRACTOR_WILDCARD_ANNOTATION;
     wildcard_annotation.length = (int32_t)strlen(ION_EXTRACTOR_WILDCARD_ANNOTATION);
@@ -209,7 +212,7 @@ iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_C
         }
     }
     IONCHECK(ion_reader_step_out(reader));
-    IONCHECK(ion_extractor_register_path_start(extractor, path_length, callback, user_context, path));
+    IONCHECK(ion_extractor_register_path_start(extractor, path_length, callback, user_context, &path));
     for (i = 0; i < path_length; i++) {
         component = &components[i];
         switch (component->type) {
@@ -226,10 +229,12 @@ iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_C
                 FAILWITH(IERR_INVALID_STATE);
         }
     }
+
+    *p_path = path;
     iRETURN;
 }
 
-iERR _ion_extractor_evaluate_field_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_COMPONENT *path_component, BOOL *matches) {
+iERR _ion_extractor_evaluate_field_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_COMPONENT *path_component, bool *matches) {
     iENTER;
     ION_STRING field_name;
 
@@ -240,14 +245,14 @@ iERR _ion_extractor_evaluate_field_predicate(ION_READER *reader, ION_EXTRACTOR_P
     iRETURN;
 }
 
-iERR _ion_extractor_evaluate_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_COMPONENT *path_component, POSITION ordinal, BOOL *matches) {
+iERR _ion_extractor_evaluate_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_COMPONENT *path_component, POSITION ordinal, bool *matches) {
     iENTER;
 
     ASSERT(reader);
     ASSERT(path_component);
     ASSERT(matches);
 
-    *matches = FALSE;
+    *matches = false;
 
     switch (path_component->type) {
         case FIELD:
@@ -258,7 +263,7 @@ iERR _ion_extractor_evaluate_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_CO
             break;
         case WILDCARD:
             // TODO different types of wildcards?
-            *matches = TRUE;
+            *matches = true;
             break;
         default:
             FAILWITH(IERR_INVALID_STATE);
@@ -272,7 +277,7 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
                                         ION_EXTRACTOR_ACTIVE_PATH_MAP *current_depth_actives) {
     iENTER;
     int8_t i;
-    BOOL matches;
+    bool matches;
     ION_EXTRACTOR_PATH_COMPONENT *path_component;
     ION_EXTRACTOR_MATCHER *matcher;
 

@@ -38,7 +38,7 @@
 
 /**
  * Limit on the maximum number of paths that can be registered to any extractor. Registered paths are assigned a bit
- * index in a length-64 bitmap.
+ * index in a bitmap of length >= 64.
  * NOTE: this is a constant that may not be redefined by the user.
  */
 #define ION_EXTRACTOR_MAX_NUM_PATHS_LIMIT (sizeof(uint_fast64_t))
@@ -159,13 +159,18 @@ typedef ION_EXTRACTOR *hEXTRACTOR;
 typedef struct _ion_extractor_path_descriptor ION_EXTRACTOR_PATH_DESCRIPTOR;
 
 /**
+ * Handle to an ION_EXTRACTOR_PATH_DESCRIPTOR.
+ */
+typedef ION_EXTRACTOR_PATH_DESCRIPTOR *hPATH;
+
+/**
  * An instruction used by callback implementations to control execution of the extractor after a match. In general,
  * these instructions tell the extractor to "step-out-N", meaning that the extractor should continue processing from
  * N levels up from the length of the matched path.
  *
- * The following macros are provided for convenience:
- *  `ION_EXTRACTOR_CONTROL_STEP_OUT(n)` - Creates a control instruction that tells the extractor to step out N.
- *  `ION_EXTRACTOR_CONTROL_NEXT()` - Creates a control instruction that tells the extractor to continue normally,
+ * The following functions are provided for convenience:
+ *  `ion_extractor_control_step_out` - Creates a control instruction that tells the extractor to step out N.
+ *  `ion_extractor_control_next` - Creates a control instruction that tells the extractor to continue normally,
  *      without stepping out (i.e. step out 0).
  */
 typedef int_fast16_t ION_EXTRACTOR_CONTROL;
@@ -198,7 +203,7 @@ static inline ION_EXTRACTOR_CONTROL ion_extractor_control_next()
  *  path registration.
  * @param control - A control instruction to be conveyed back to the extractor (output parameter).
  */
-typedef iERR (*ION_EXTRACTOR_CALLBACK)(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context,
+typedef iERR (*ION_EXTRACTOR_CALLBACK)(hREADER reader, hPATH matched_path, void *user_context,
                                        ION_EXTRACTOR_CONTROL *control);
 
 /**
@@ -222,45 +227,52 @@ ION_API_EXPORT iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTI
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.
  * @param user_context - User context data to be passed as an argument to `callback`. This data remains opaque to the
  *  extractor, and may be null.
+ * @param path - A handle to the resulting path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  *
  * Ownership: the caller owns the callback and the user context.
  */
 ION_API_EXPORT iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length,
                                                       ION_EXTRACTOR_CALLBACK callback, void *user_context,
-                                                      ION_EXTRACTOR_PATH_DESCRIPTOR *path);
+                                                      hPATH *p_path);
 
 /**
- * Appends a path component representing a field name to the current path. Calling this function will fail unless there
- * has been exactly one more call to `ion_extractor_register_path_start` than to `ion_extractor_register_path_finish`.
+ * Appends a path component representing a field name to the given path. Calling this function will fail if the given
+ * path was not created using `ion_extractor_register_path_start` or if appending another component to the given path
+ * would cause it to exceed the length declared during the call to `ion_extractor_register_path_start`.
  *
- * @param extractor - An extractor which has already been opened by calling `ion_extractor_open` and has an active path.
+ * @param path - A path which has already been registered to an extractor by calling
+ *  `ion_extractor_register_path_start`.
  * @param value - The field name to add to the path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  *
  * Ownership: the caller owns the value, but is not required to keep it accessible after this call.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_field(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_STRING *value);
+ION_API_EXPORT iERR ion_extractor_register_path_append_field(hPATH path, ION_STRING *value);
 
 /**
- * Appends a path component representing an ordinal (e.g. a collection index) to the current path. Calling this function
- * will fail unless there has been exactly one more call to `ion_extractor_register_path_start` than to
- * `ion_extractor_register_path_finish`.
+ * Appends a path component representing an ordinal (e.g. a collection index) to the given path. Calling this function
+ * will fail if the given path was not created using `ion_extractor_register_path_start` or if appending another
+ * component to the given path would cause it to exceed the length declared during the call to
+ * `ion_extractor_register_path_start`.
  *
- * @param extractor - An extractor which has already been opened by calling `ion_extractor_open` and has an active path.
+ * @param path - A path which has already been registered to an extractor by calling
+ *  `ion_extractor_register_path_start`.
  * @param value - The ordinal to add to the path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_ordinal(ION_EXTRACTOR_PATH_DESCRIPTOR *path, POSITION value);
+ION_API_EXPORT iERR ion_extractor_register_path_append_ordinal(hPATH path, POSITION value);
 
 /**
- * Appends a path component representing a wildcard to the current path.  Calling this function will fail unless there
- * has been exactly one more call to `ion_extractor_register_path_start` than to `ion_extractor_register_path_finish`.
+ * Appends a path component representing a wildcard to the given path. Calling this function will fail if the given path
+ * was not created using `ion_extractor_register_path_start` or if appending another component to the given path would
+ * cause it to exceed the length declared during the call to `ion_extractor_register_path_start`.
  *
- * @param extractor - An extractor which has already been opened by calling `ion_extractor_open` and has an active path.
+ * @param path - A path which has already been registered to an extractor by calling
+ *  `ion_extractor_register_path_start`.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *path);
+ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(hPATH path);
 
 /**
  * Registers a path from text or binary Ion data. The data must contain exactly one top-level value: an ordered sequence
@@ -274,9 +286,8 @@ ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PA
  *    (abc $ion_wildcard::'*' def 2)
  *  </pre>
  * represents a path of length 4 consisting of a field, wildcard, field, and ordinal.
- * NOTE: this is a standalone function that does not require calls to `ion_extractor_register_path_start` nor
- * `ion_extractor_register_path_finish`. However, other paths registered to the same extractor may be constructed
- * using those functions.
+ * NOTE: this is a standalone function that does not require a call to `ion_extractor_register_path_start`. However,
+ * other paths registered to the same extractor may be constructed using that functions.
  *
  * @param extractor - An extractor which has already been opened by calling `ion_extractor_open`.
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.
@@ -291,7 +302,7 @@ ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PA
  */
 ION_API_EXPORT iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_CALLBACK callback,
                                                          void *user_context, BYTE *ion_data, SIZE ion_data_length,
-                                                         ION_EXTRACTOR_PATH_DESCRIPTOR *path);
+                                                         hPATH *path);
 
 /**
  * Extracts matches within the data read by the extractor's reader using the extractor's registered paths.
