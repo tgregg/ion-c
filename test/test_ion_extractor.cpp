@@ -31,12 +31,13 @@
 #define ION_EXTRACTOR_TEST_INIT \
     hREADER reader; \
     hEXTRACTOR extractor; \
-    hPATH path; \
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path; \
     int num_paths = 0; \
     ASSERTION_CONTEXT assertion_contexts[ION_EXTRACTOR_TEST_MAX_PATHS]; \
     ASSERTION_CONTEXT *assertion_context; \
     ASSERT_MATCHES assertion; \
     ION_EXTRACTOR_OPTIONS options; \
+    path = (ION_EXTRACTOR_PATH_DESCRIPTOR *)malloc(sizeof(ION_EXTRACTOR_PATH_DESCRIPTOR)); \
     options.max_path_length = ION_EXTRACTOR_TEST_PATH_LENGTH; \
     options.max_num_paths = ION_EXTRACTOR_TEST_MAX_PATHS; \
     ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
@@ -53,15 +54,14 @@
  * Starts a path and initializes its test assertion context, which will be passed through the extractor as user context.
  * `assert_matches` must first be set to the ASSERT_MATCHES that should be called when this path matches.
  */
-#define ION_EXTRACTOR_TEST_PATH_START \
+#define ION_EXTRACTOR_TEST_PATH_START(path_length) \
     ION_EXTRACTOR_TEST_NEXT_CONTEXT; \
-    ION_ASSERT_OK(ion_extractor_register_path_start(extractor, &testCallback, assertion_context));
+    ION_ASSERT_OK(ion_extractor_register_path_start(extractor, path_length, &testCallback, assertion_context, path));
 
 /**
  * Finishes the current path.
  */
 #define ION_EXTRACTOR_TEST_PATH_END \
-    ION_ASSERT_OK(ion_extractor_register_path_finish(extractor, &path)); \
     assertion_context->path = path;
 
 /**
@@ -69,8 +69,8 @@
  */
 #define ION_EXTRACTOR_TEST_PATH_FROM_TEXT(text) \
     ION_EXTRACTOR_TEST_NEXT_CONTEXT; \
-    ION_ASSERT_OK(ion_extractor_register_path_from_ion(extractor, &testCallback, assertion_context, (BYTE *)text, (SIZE)strlen(text), &path)); \
-    assertion_context->path = path;
+    ION_ASSERT_OK(ion_extractor_register_path_from_ion(extractor, &testCallback, assertion_context, (BYTE *)text, (SIZE)strlen(text), path)); \
+    ION_EXTRACTOR_TEST_PATH_END;
 
 /**
  * Generic execution of an extractor for extractor tests. A const char * named `ion_text` must be declared first.
@@ -80,6 +80,9 @@
     ION_ASSERT_OK(ion_extractor_match(extractor, reader)); \
     ION_ASSERT_OK(ion_extractor_close(extractor)); \
     ION_ASSERT_OK(ion_reader_close(reader));
+
+#define ION_EXTRACTOR_TEST_FINISH \
+    free(path);
 
 /**
  * Asserts that the path at the given index matched n times. Paths are indexed in the order they are added, starting
@@ -99,7 +102,7 @@ typedef void (*ASSERT_MATCHES)(ION_READER *reader, ION_EXTRACTOR_PATH_DESCRIPTOR
  */
 typedef struct _assertion_context {
     ASSERT_MATCHES assertion;
-    hPATH path;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
     int num_matches;
 } ASSERTION_CONTEXT;
 
@@ -133,12 +136,14 @@ TEST(IonExtractor, MatchesByFieldAtDepth1) {
     ION_ASSERT_OK(ion_string_from_cstr("abc", &value));
 
     assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &value));
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &value));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByFieldAtDepth1FromIon) {
@@ -150,6 +155,8 @@ TEST(IonExtractor, MatchesByFieldAtDepth1FromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertMatchesByOrdinalAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -162,12 +169,14 @@ TEST(IonExtractor, MatchesByOrdinalAtDepth1) {
     const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
 
     assertion = &assertMatchesByOrdinalAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(extractor, 0));
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(path, 0));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByOrdinalAtDepth1FromIon) {
@@ -179,6 +188,8 @@ TEST(IonExtractor, MatchesByOrdinalAtDepth1FromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertMatchesByFieldAndOrdinalAtDepth3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -200,14 +211,16 @@ TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3) {
     ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
 
     assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &foo_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &bar_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(extractor, 2));
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(path, 2));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIon) {
@@ -219,6 +232,8 @@ TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIonAlternate) {
@@ -230,6 +245,8 @@ TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIonAlternate) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertMatchesByWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -251,14 +268,16 @@ TEST(IonExtractor, MatchesByWildcard) {
     ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
 
     assertion = &assertMatchesByWildcard;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &foo_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &bar_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_wildcard(extractor));
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_wildcard(path));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByWildcardFromIon) {
@@ -272,6 +291,8 @@ TEST(IonExtractor, MatchesByWildcardFromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesByWildcardWithFieldNameStar) {
@@ -283,6 +304,8 @@ TEST(IonExtractor, MatchesByWildcardWithFieldNameStar) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertMatchesByNonTerminalWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -305,6 +328,8 @@ TEST(IonExtractor, MatchesByNonTerminalWildcard) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesMultiplePaths) {
@@ -316,20 +341,22 @@ TEST(IonExtractor, MatchesMultiplePaths) {
     ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
 
     assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &foo_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &bar_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(extractor, 2));
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(path, 2));
     ION_EXTRACTOR_TEST_PATH_END;
 
     assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &abc_field));
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &abc_field));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesMultiplePathsFromIon) {
@@ -345,6 +372,8 @@ TEST(IonExtractor, MatchesMultiplePathsFromIon) {
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -372,12 +401,14 @@ TEST(IonExtractor, MatchesSamePathMultipleTimes) {
     ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
 
     assertion = &assertMatchesSamePathMultipleTimes;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &abc_field));
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &abc_field));
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, MatchesSamePathMultipleTimesFromIon) {
@@ -389,6 +420,8 @@ TEST(IonExtractor, MatchesSamePathMultipleTimesFromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 void assertDoesNotMatchPath(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
@@ -403,14 +436,16 @@ TEST(IonExtractor, DoesNotMatchPath) {
     ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
 
     assertion = &assertDoesNotMatchPath;
-    ION_EXTRACTOR_TEST_PATH_START;
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &foo_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_field(extractor, &bar_field));
-    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(extractor, 3)); // This ordinal is out of range of the data.
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_register_path_append_ordinal(path, 3)); // This ordinal is out of range of the data.
     ION_EXTRACTOR_TEST_PATH_END;
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 0); // Matched zero times.
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, DoesNotMatchPathFromIon) {
@@ -422,6 +457,8 @@ TEST(IonExtractor, DoesNotMatchPathFromIon) {
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 0); // Matched zero times.
+
+    ION_EXTRACTOR_TEST_FINISH;
 }
 
 TEST(IonExtractor, FailsOnTooLargeMaxPathLength) {

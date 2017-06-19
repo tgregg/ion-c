@@ -67,27 +67,41 @@ iERR ion_extractor_close(hEXTRACTOR extractor) {
     iRETURN;
 }
 
-iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_CALLBACK callback, void *user_context) {
+iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length, ION_EXTRACTOR_CALLBACK callback, void *user_context, ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
     iENTER;
     ION_EXTRACTOR_MATCHER *matcher;
 
+    if (!path) {
+        FAILWITHMSG(IERR_INVALID_ARG, "Path must not be null.");
+    }
     if (extractor->matchers_length >= extractor->options.max_num_paths) {
         FAILWITHMSG(IERR_NO_MEMORY, "Too many registered paths.");
     }
     if (extractor->_path_in_progress || extractor->_cur_path_len != 0) {
         FAILWITHMSG(IERR_INVALID_STATE, "Cannot start new path before finishing the previous one.");
     }
+    //if (path->extractor) {
+    //    FAILWITHMSG(IERR_INVALID_STATE, "Cannot start a path that has previously been started.");
+    //}
+    if (path_length > extractor->options.max_path_length || path_length <= 0) {
+        FAILWITHMSG(IERR_INVALID_ARG, "Illegal number of path components.");
+    }
     extractor->_path_in_progress = TRUE;
-    matcher = &extractor->matchers[extractor->matchers_length];
+    path->path_length = path_length;
+    path->path_id = extractor->matchers_length;
+    path->extractor = extractor;
+    matcher = &extractor->matchers[path->path_id];
     matcher->callback = callback;
     matcher->user_context = user_context;
+    matcher->path = path;
 
     iRETURN;
 }
 
-iERR _ion_extractor_append_helper(ION_EXTRACTOR *extractor, ION_EXTRACTOR_PATH_COMPONENT **p_component) {
+iERR _ion_extractor_path_append_helper(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_EXTRACTOR_PATH_COMPONENT **p_component) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
+    ION_EXTRACTOR *extractor = path->extractor;
 
     ASSERT(p_component);
     ASSERT(extractor->matchers_length >= 0);
@@ -96,83 +110,61 @@ iERR _ion_extractor_append_helper(ION_EXTRACTOR *extractor, ION_EXTRACTOR_PATH_C
         FAILWITHMSG(IERR_INVALID_STATE, "No path is in progress.");
     }
 
-    if (extractor->_cur_path_len >= extractor->options.max_path_length) {
+    if (extractor->_cur_path_len >= extractor->options.max_path_length || extractor->_cur_path_len >= path->path_length) {
         FAILWITHMSG(IERR_INVALID_STATE, "Path is too long.");
     }
 
     component = ION_EXTRACTOR_GET_COMPONENT(extractor, extractor->_cur_path_len, extractor->matchers_length);
-    extractor->_cur_path_len++;
+    component->is_terminal = (++extractor->_cur_path_len == path->path_length);
+    if (component->is_terminal) {
+        extractor->_path_in_progress = FALSE;
+        extractor->_cur_path_len = 0;
+        extractor->matchers_length++;
+    }
     *p_component = component;
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_field(hEXTRACTOR extractor, ION_STRING *value) {
+iERR ion_extractor_register_path_append_field(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_STRING *value) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
-    IONCHECK(_ion_extractor_append_helper(extractor, &component));
+    IONCHECK(_ion_extractor_path_append_helper(path, &component));
     // Note: this is an allocation, with extractor as the memory owner. This allocated memory is freed by
     // `ion_free_owner` during `ion_extractor_close`. Each of these occupies space in a contiguous block assigned
     // to the extractor.
-    IONCHECK(ion_string_copy_to_owner(extractor, &component->value.text, value));
+    IONCHECK(ion_string_copy_to_owner(path->extractor, &component->value.text, value));
     component->type = FIELD;
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_ordinal(hEXTRACTOR extractor, POSITION value) {
+iERR ion_extractor_register_path_append_ordinal(ION_EXTRACTOR_PATH_DESCRIPTOR *path, POSITION value) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
-    IONCHECK(_ion_extractor_append_helper(extractor, &component));
+    IONCHECK(_ion_extractor_path_append_helper(path, &component));
     component->value.ordinal = value;
     component->type = ORDINAL;
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_wildcard(hEXTRACTOR extractor) {
+iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
-    IONCHECK(_ion_extractor_append_helper(extractor, &component));
+    IONCHECK(_ion_extractor_path_append_helper(path, &component));
     component->type = WILDCARD;
-    iRETURN;
-}
-
-iERR ion_extractor_register_path_finish(hEXTRACTOR extractor, ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
-    iENTER;
-    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
-    ION_EXTRACTOR_PATH_COMPONENT *terminal_component;
-    ASSERT(extractor->matchers_length >= 0 && extractor->matchers_length <= extractor->options.max_num_paths);
-    ASSERT(p_path);
-
-    if (!extractor->_path_in_progress) {
-        FAILWITHMSG(IERR_INVALID_STATE, "No path is in progress.");
-    }
-
-    if (extractor->_cur_path_len <= 0) {
-        FAILWITHMSG(IERR_INVALID_STATE, "Paths must have at least one component.");
-    }
-
-    terminal_component = ION_EXTRACTOR_GET_COMPONENT(extractor, extractor->_cur_path_len - 1, extractor->matchers_length);
-    terminal_component->is_terminal = TRUE;
-    path = &extractor->matchers[extractor->matchers_length].path;
-    path->path_length = extractor->_cur_path_len;
-    path->path_id = extractor->matchers_length;
-    extractor->_cur_path_len = 0;
-    extractor->matchers_length++;
-    extractor->_path_in_progress = FALSE;
-    *p_path = path;
-
     iRETURN;
 }
 
 iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_CALLBACK callback,
                                           void *user_context, BYTE *ion_data, SIZE ion_data_length,
-                                          hPATH *path) {
+                                          ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
     iENTER;
     ION_READER *reader = NULL;
     ION_READER_OPTIONS options;
     ION_TYPE type;
-    ION_STRING text, annotation, wildcard_annotation;
-    POSITION ordinal;
+    ION_STRING text, wildcard_annotation;
     BOOL has_annotations;
+    ION_EXTRACTOR_PATH_COMPONENT components[ION_EXTRACTOR_MAX_PATH_LENGTH], *component;
+    ION_EXTRACTOR_SIZE path_length = 0, i;
 
     wildcard_annotation.value = (BYTE *)ION_EXTRACTOR_WILDCARD_ANNOTATION;
     wildcard_annotation.length = (int32_t)strlen(ION_EXTRACTOR_WILDCARD_ANNOTATION);
@@ -185,37 +177,55 @@ iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_C
     if (type != tid_SEXP && type != tid_LIST) {
         FAILWITHMSG(IERR_INVALID_ARG, "Improper path format.");
     }
-    IONCHECK(ion_extractor_register_path_start(extractor, callback, user_context));
     IONCHECK(ion_reader_step_in(reader));
     for (;;) {
+        component = &components[path_length];
         IONCHECK(ion_reader_next(reader, &type));
         if (type == tid_EOF) {
             break;
         }
+        path_length++;
         switch(ION_TYPE_INT(type)) {
             case tid_INT_INT:
-                IONCHECK(ion_reader_read_int64(reader, &ordinal));
-                IONCHECK(ion_extractor_register_path_append_ordinal(extractor, ordinal));
+                component->type = ORDINAL;
+                IONCHECK(ion_reader_read_int64(reader, &component->value.ordinal));
                 break;
             case tid_SYMBOL_INT:
             case tid_STRING_INT:
                 IONCHECK(ion_reader_has_any_annotations(reader, &has_annotations));
                 if (has_annotations) {
-                    IONCHECK(ion_reader_get_an_annotation(reader, 0, &annotation));
-                    if (ION_STRING_EQUALS(&wildcard_annotation, &annotation)) {
-                        IONCHECK(ion_extractor_register_path_append_wildcard(extractor));
+                    IONCHECK(ion_reader_get_an_annotation(reader, 0, &text));
+                    if (ION_STRING_EQUALS(&wildcard_annotation, &text)) {
+                        component->type = WILDCARD;
                         break;
                     }
                 }
+                component->type = FIELD;
                 IONCHECK(ion_reader_read_string(reader, &text));
-                IONCHECK(ion_extractor_register_path_append_field(extractor, &text));
+                IONCHECK(ion_string_copy_to_owner(extractor, &component->value.text, &text));
                 break;
             default:
                 FAILWITHMSG(IERR_INVALID_ARG, "Improper path format.");
         }
     }
     IONCHECK(ion_reader_step_out(reader));
-    IONCHECK(ion_extractor_register_path_finish(extractor, path));
+    IONCHECK(ion_extractor_register_path_start(extractor, path_length, callback, user_context, path));
+    for (i = 0; i < path_length; i++) {
+        component = &components[i];
+        switch (component->type) {
+            case ORDINAL:
+                IONCHECK(ion_extractor_register_path_append_ordinal(path, component->value.ordinal));
+                break;
+            case FIELD:
+                IONCHECK(ion_extractor_register_path_append_field(path, &component->value.text));
+                break;
+            case WILDCARD:
+                IONCHECK(ion_extractor_register_path_append_wildcard(path));
+                break;
+            default:
+                FAILWITH(IERR_INVALID_STATE);
+        }
+    }
     iRETURN;
 }
 
@@ -283,7 +293,7 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
             if (matches) {
                 if (path_component->is_terminal) {
                     matcher = &extractor->matchers[i];
-                    matcher->callback(reader, &matcher->path, matcher->user_context, control);
+                    matcher->callback(reader, matcher->path, matcher->user_context, control);
                     if (*control) {
                         SUCCEED(); // TODO do what? There are still more predicates to match for this value.
                     }

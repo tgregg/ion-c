@@ -24,14 +24,6 @@ extern "C" {
 #endif
 
 /**
- * Represents indices and sizes for extractor-internal data.
- * NOTE: this can be a uint8_t because both ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS and
- * ION_EXTRACTOR_DEFAULT_MAX_PATH_LENGTH can be represented in 8 bits. Raising these limits (or making them
- * configurable) will require a larger data type.
- */
-typedef uint8_t ION_EXTRACTOR_SIZE;
-
-/**
  * A path for the extractor to match.
  */
 struct _ion_extractor_path_descriptor {
@@ -44,6 +36,8 @@ struct _ion_extractor_path_descriptor {
      * The number of components in the path, i.e. the length of `path_components`.
      */
     ION_EXTRACTOR_SIZE path_length;
+
+    ION_EXTRACTOR *extractor;
 
 };
 
@@ -111,7 +105,7 @@ typedef struct _ion_extractor_matcher {
     /**
      * The path to match.
      */
-    ION_EXTRACTOR_PATH_DESCRIPTOR path;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path;
 
     /**
      * The callback to invoke when the path matches.
