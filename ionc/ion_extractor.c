@@ -67,7 +67,8 @@ iERR ion_extractor_close(hEXTRACTOR extractor) {
     iRETURN;
 }
 
-iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length, ION_EXTRACTOR_CALLBACK callback, void *user_context, ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
+iERR ion_extractor_path_create(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length, ION_EXTRACTOR_CALLBACK callback,
+                               void *user_context, ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
     iENTER;
     ION_EXTRACTOR_MATCHER *matcher;
     ION_EXTRACTOR_PATH_DESCRIPTOR *path;
@@ -125,7 +126,7 @@ iERR _ion_extractor_path_append_helper(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_field(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_STRING *value) {
+iERR ion_extractor_path_append_field(ION_EXTRACTOR_PATH_DESCRIPTOR *path, ION_STRING *value) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
     IONCHECK(_ion_extractor_path_append_helper(path, &component));
@@ -137,7 +138,7 @@ iERR ion_extractor_register_path_append_field(ION_EXTRACTOR_PATH_DESCRIPTOR *pat
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_ordinal(ION_EXTRACTOR_PATH_DESCRIPTOR *path, POSITION value) {
+iERR ion_extractor_path_append_ordinal(ION_EXTRACTOR_PATH_DESCRIPTOR *path, POSITION value) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
     IONCHECK(_ion_extractor_path_append_helper(path, &component));
@@ -146,7 +147,7 @@ iERR ion_extractor_register_path_append_ordinal(ION_EXTRACTOR_PATH_DESCRIPTOR *p
     iRETURN;
 }
 
-iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
+iERR ion_extractor_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *path) {
     iENTER;
     ION_EXTRACTOR_PATH_COMPONENT *component;
     IONCHECK(_ion_extractor_path_append_helper(path, &component));
@@ -154,9 +155,9 @@ iERR ion_extractor_register_path_append_wildcard(ION_EXTRACTOR_PATH_DESCRIPTOR *
     iRETURN;
 }
 
-iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_CALLBACK callback,
-                                          void *user_context, BYTE *ion_data, SIZE ion_data_length,
-                                          ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
+iERR ion_extractor_path_create_from_ion(hEXTRACTOR extractor, ION_EXTRACTOR_CALLBACK callback,
+                                        void *user_context, BYTE *ion_data, SIZE ion_data_length,
+                                        ION_EXTRACTOR_PATH_DESCRIPTOR **p_path) {
     iENTER;
     ION_READER *reader = NULL;
     ION_READER_OPTIONS options;
@@ -212,18 +213,18 @@ iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_C
         }
     }
     IONCHECK(ion_reader_step_out(reader));
-    IONCHECK(ion_extractor_register_path_start(extractor, path_length, callback, user_context, &path));
+    IONCHECK(ion_extractor_path_create(extractor, path_length, callback, user_context, &path));
     for (i = 0; i < path_length; i++) {
         component = &components[i];
         switch (component->type) {
             case ORDINAL:
-                IONCHECK(ion_extractor_register_path_append_ordinal(path, component->value.ordinal));
+                IONCHECK(ion_extractor_path_append_ordinal(path, component->value.ordinal));
                 break;
             case FIELD:
-                IONCHECK(ion_extractor_register_path_append_field(path, &component->value.text));
+                IONCHECK(ion_extractor_path_append_field(path, &component->value.text));
                 break;
             case WILDCARD:
-                IONCHECK(ion_extractor_register_path_append_wildcard(path));
+                IONCHECK(ion_extractor_path_append_wildcard(path));
                 break;
             default:
                 FAILWITH(IERR_INVALID_STATE);

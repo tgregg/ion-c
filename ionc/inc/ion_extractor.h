@@ -219,60 +219,55 @@ ION_API_EXPORT iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTI
 
 /**
  * Registers the given callback and user context to a new empty path. To finish constructing the path, the user
- * must append at least one path component and must then call `ion_extractor_path_finish` before calling
- * `ion_extractor_match`. Calling this function will fail unless `ion_extractor_register_path_start` and
- * `ion_extractor_register_path_finish` have been called the same number of times.
+ * must append exactly `path_length` components to the resulting path before calling `ion_extractor_match` on this
+ * extractor.
  *
  * @param extractor - An extractor which has already been opened by calling `ion_extractor_open`.
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.
  * @param user_context - User context data to be passed as an argument to `callback`. This data remains opaque to the
  *  extractor, and may be null.
- * @param path - A handle to the resulting path.
+ * @param path - A non-null pointer to a handle to the resulting path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  *
  * Ownership: the caller owns the callback and the user context.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_start(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length,
-                                                      ION_EXTRACTOR_CALLBACK callback, void *user_context,
-                                                      hPATH *p_path);
+ION_API_EXPORT iERR ion_extractor_path_create(hEXTRACTOR extractor, ION_EXTRACTOR_SIZE path_length,
+                                              ION_EXTRACTOR_CALLBACK callback, void *user_context,
+                                              hPATH *p_path);
 
 /**
  * Appends a path component representing a field name to the given path. Calling this function will fail if the given
- * path was not created using `ion_extractor_register_path_start` or if appending another component to the given path
- * would cause it to exceed the length declared during the call to `ion_extractor_register_path_start`.
+ * path was not created using `ion_extractor_path_create` or if appending another component to the given path
+ * would cause it to exceed the length declared during the call to `ion_extractor_path_create`.
  *
- * @param path - A path which has already been registered to an extractor by calling
- *  `ion_extractor_register_path_start`.
+ * @param path - A path which has already been registered to an extractor by calling `ion_extractor_path_create`.
  * @param value - The field name to add to the path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  *
  * Ownership: the caller owns the value, but is not required to keep it accessible after this call.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_field(hPATH path, ION_STRING *value);
+ION_API_EXPORT iERR ion_extractor_path_append_field(hPATH path, ION_STRING *value);
 
 /**
  * Appends a path component representing an ordinal (e.g. a collection index) to the given path. Calling this function
- * will fail if the given path was not created using `ion_extractor_register_path_start` or if appending another
- * component to the given path would cause it to exceed the length declared during the call to
- * `ion_extractor_register_path_start`.
+ * will fail if the given path was not created using `ion_extractor_path_create` or if appending another component to
+ * the given path would cause it to exceed the length declared during the call to `ion_extractor_path_create`.
  *
- * @param path - A path which has already been registered to an extractor by calling
- *  `ion_extractor_register_path_start`.
+ * @param path - A path which has already been registered to an extractor by calling `ion_extractor_path_create`.
  * @param value - The ordinal to add to the path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_ordinal(hPATH path, POSITION value);
+ION_API_EXPORT iERR ion_extractor_path_append_ordinal(hPATH path, POSITION value);
 
 /**
  * Appends a path component representing a wildcard to the given path. Calling this function will fail if the given path
- * was not created using `ion_extractor_register_path_start` or if appending another component to the given path would
- * cause it to exceed the length declared during the call to `ion_extractor_register_path_start`.
+ * was not created using `ion_extractor_path_create` or if appending another component to the given path would cause it
+ * to exceed the length declared during the call to `ion_extractor_path_create`.
  *
- * @param path - A path which has already been registered to an extractor by calling
- *  `ion_extractor_register_path_start`.
+ * @param path - A path which has already been registered to an extractor by calling `ion_extractor_path_create`.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(hPATH path);
+ION_API_EXPORT iERR ion_extractor_path_append_wildcard(hPATH path);
 
 /**
  * Registers a path from text or binary Ion data. The data must contain exactly one top-level value: an ordered sequence
@@ -286,8 +281,8 @@ ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(hPATH path);
  *    (abc $ion_wildcard::'*' def 2)
  *  </pre>
  * represents a path of length 4 consisting of a field, wildcard, field, and ordinal.
- * NOTE: this is a standalone function that does not require a call to `ion_extractor_register_path_start`. However,
- * other paths registered to the same extractor may be constructed using that functions.
+ * NOTE: this is a standalone function that does not require a call to `ion_extractor_path_create`. However, other paths
+ * registered to the same extractor may be constructed using that functions.
  *
  * @param extractor - An extractor which has already been opened by calling `ion_extractor_open`.
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.
@@ -295,14 +290,14 @@ ION_API_EXPORT iERR ion_extractor_register_path_append_wildcard(hPATH path);
  *  extractor, and may be null.
  * @param ion_data - The ion data representing the path, which follows the schema described above.
  * @param ion_data_length - The length, in bytes, of `ion_data`.
- * @param path - A handle to the resulting path.
+ * @param path - A non-null pointer to a handle to the resulting path.
  * @return a non-zero error code in the case of failure, otherwise IERR_OK.
  *
  * Ownership: the caller owns the callback and the user context.
  */
-ION_API_EXPORT iERR ion_extractor_register_path_from_ion(hEXTRACTOR  extractor, ION_EXTRACTOR_CALLBACK callback,
-                                                         void *user_context, BYTE *ion_data, SIZE ion_data_length,
-                                                         hPATH *path);
+ION_API_EXPORT iERR ion_extractor_path_create_from_ion(hEXTRACTOR extractor, ION_EXTRACTOR_CALLBACK callback,
+                                                       void *user_context, BYTE *ion_data, SIZE ion_data_length,
+                                                       hPATH *path);
 
 /**
  * Extracts matches within the data read by the extractor's reader using the extractor's registered paths.

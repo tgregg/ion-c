@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 /**
- * A path for the extractor to match.
+ * A descriptor for a path for the extractor to match.
  */
 struct _ion_extractor_path_descriptor {
     /**
@@ -33,10 +33,13 @@ struct _ion_extractor_path_descriptor {
     ION_EXTRACTOR_SIZE path_id;
 
     /**
-     * The number of components in the path, i.e. the length of `path_components`.
+     * The number of components in the path.
      */
     ION_EXTRACTOR_SIZE path_length;
 
+    /**
+     * The extractor to which this path is registered.
+     */
     ION_EXTRACTOR *extractor;
 
 };
