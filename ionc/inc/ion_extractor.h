@@ -20,6 +20,7 @@
 #define ION_EXTRACTOR_H
 
 #include "ion.h"
+#include <stdbool.h>
 
 #ifdef ION_EXTRACTOR_MAX_PATH_LENGTH_LIMIT
     #undef ION_EXTRACTOR_MAX_PATH_LENGTH_LIMIT
@@ -140,6 +141,20 @@ typedef struct _ion_extractor_options {
      * be organized, which may improve performance.
      */
     ION_EXTRACTOR_SIZE max_num_paths;
+
+    /**
+     * If `true`, the extractor will accept a reader positioned at any valid depth within the data. It will match paths
+     * relative to the initial depth of the reader at the start of `ion_extractor_match`. For example, if a reader
+     * positioned at depth 2 at the field 'foo' in the data `{abc:{foo:{bar:baz}}}` is provided to an extractor with
+     * `match_relative_paths=true` and a the registered path `(bar)`, the extractor would match on the value `baz`. This
+     * extractor would finish matching once it exhausts all sibling values (none in this case) at its initial depth
+     * of 1.
+     *
+     * If `false`, the extractor requires a reader positioned at depth 0.
+     *
+     * Defaults to `false`.
+     */
+    bool match_relative_paths;
 
 } ION_EXTRACTOR_OPTIONS;
 

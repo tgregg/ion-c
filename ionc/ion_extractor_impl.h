@@ -17,7 +17,6 @@
 
 #include "ion_internal.h"
 #include "ion_extractor.h"
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -143,6 +142,13 @@ struct _ion_extractor {
      * The configuration options.
      */
     ION_EXTRACTOR_OPTIONS options;
+
+    /**
+     * The initial depth at which the extractor begins matching. This extractor will finish matching once it has
+     * processed all siblings of the first value encountered at this depth. NOTE: if `options.match_relative_paths` is
+     * `true`, this MUST be zero.
+     */
+    SIZE _initial_depth;
 
     /**
      * Nonzero if the user has started, but not finished, a path. When nonzero, the user cannot start matching.

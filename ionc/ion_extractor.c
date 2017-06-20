@@ -18,7 +18,7 @@
 #define ION_EXTRACTOR_ALL_PATHS_ACTIVE (ION_EXTRACTOR_ACTIVE_PATH_MAP)0xFFFFFFFFFFFFFFFF
 
 #define ION_EXTRACTOR_GET_COMPONENT(extractor, path_depth, path_index) \
-    &extractor->path_components[(path_depth) * extractor->options.max_num_paths + path_index]
+    &extractor->path_components[(path_depth - extractor->_initial_depth) * extractor->options.max_num_paths + path_index]
 
 #define ION_EXTRACTOR_WILDCARD_ANNOTATION "$ion_wildcard"
 
@@ -46,6 +46,7 @@ iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
     memset(pextractor, 0, len);
     pextractor->options.max_num_paths = (options) ? options->max_num_paths : (ION_EXTRACTOR_SIZE)ION_EXTRACTOR_MAX_NUM_PATHS;
     pextractor->options.max_path_length = (options) ? options->max_path_length : (ION_EXTRACTOR_SIZE)ION_EXTRACTOR_MAX_PATH_LENGTH;
+    pextractor->options.match_relative_paths = (options) ? options->match_relative_paths : false;
 
     iRETURN;
 }
@@ -351,12 +352,12 @@ iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE 
         }
         // Each value at depth N can match any active partial path from depth N - 1.
         current_depth_actives = 0;
-        if (depth > 0) {
+        if (depth - extractor->_initial_depth > 0) {
             IONCHECK(_ion_extractor_evaluate_predicates(extractor, reader, depth, ordinal, &control,
                                                         previous_depth_actives, &current_depth_actives));
         }
         else {
-            ASSERT(depth == 0);
+            ASSERT(depth - extractor->_initial_depth == 0);
             // Everything matches at depth 0.
             current_depth_actives = ION_EXTRACTOR_ALL_PATHS_ACTIVE;
         }
@@ -403,12 +404,12 @@ iERR ion_extractor_match(ION_EXTRACTOR *extractor, ION_READER *reader) {
     }
 
     IONCHECK(ion_reader_get_depth(reader, &depth));
-    if (depth != 0) {
+    if (!extractor->options.match_relative_paths && depth != 0) {
         FAILWITHMSG(IERR_INVALID_STATE, "Reader must be at depth 0 to start matching.");
     }
-
+    extractor->_initial_depth = depth;
     if (extractor->matchers_length) {
-        IONCHECK(_ion_extractor_match_helper(extractor, reader, 0, 0));
+        IONCHECK(_ion_extractor_match_helper(extractor, reader, depth, 0));
     }
     iRETURN;
 }
