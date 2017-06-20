@@ -53,8 +53,8 @@ iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
             FAILWITHMSG(IERR_INVALID_ARG, "Extractor's max_path_length must be in [1, ION_EXTRACTOR_MAX_PATH_LENGTH].");
         }
     }
-    pextractor->options.max_num_paths = (options) ? options->max_num_paths : (int8_t)ION_EXTRACTOR_MAX_NUM_PATHS;
-    pextractor->options.max_path_length = (options) ? options->max_path_length : (int8_t)ION_EXTRACTOR_MAX_PATH_LENGTH;
+    pextractor->options.max_num_paths = (options) ? options->max_num_paths : (ION_EXTRACTOR_SIZE)ION_EXTRACTOR_MAX_NUM_PATHS;
+    pextractor->options.max_path_length = (options) ? options->max_path_length : (ION_EXTRACTOR_SIZE)ION_EXTRACTOR_MAX_PATH_LENGTH;
 
     iRETURN;
 }
@@ -272,15 +272,30 @@ iERR _ion_extractor_evaluate_predicate(ION_READER *reader, ION_EXTRACTOR_PATH_CO
     iRETURN;
 }
 
+iERR _ion_extractor_dispatch_match(ION_EXTRACTOR *extractor, ION_READER *reader, SIZE depth,
+                                   ION_EXTRACTOR_SIZE matcher_index, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    ION_EXTRACTOR_MATCHER *matcher;
+    SIZE new_depth;
+
+    matcher = &extractor->matchers[matcher_index];
+    IONCHECK(matcher->callback(reader, matcher->path, matcher->user_context, control));
+    IONCHECK(ion_reader_get_depth(reader, &new_depth));
+    if (depth != new_depth) {
+        FAILWITHMSG(IERR_INVALID_STATE, "Reader must be positioned at same depth after callback returns.");
+    }
+
+    iRETURN;
+}
+
 iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *reader, SIZE depth, POSITION ordinal,
                                         ION_EXTRACTOR_CONTROL *control,
                                         ION_EXTRACTOR_ACTIVE_PATH_MAP previous_depth_actives,
                                         ION_EXTRACTOR_ACTIVE_PATH_MAP *current_depth_actives) {
     iENTER;
-    int8_t i;
+    ION_EXTRACTOR_SIZE i;
     bool matches;
     ION_EXTRACTOR_PATH_COMPONENT *path_component;
-    ION_EXTRACTOR_MATCHER *matcher;
 
     ASSERT(extractor);
     ASSERT(reader);
@@ -298,8 +313,7 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
             IONCHECK(_ion_extractor_evaluate_predicate(reader, path_component, ordinal, &matches));
             if (matches) {
                 if (path_component->is_terminal) {
-                    matcher = &extractor->matchers[i];
-                    matcher->callback(reader, matcher->path, matcher->user_context, control);
+                    IONCHECK(_ion_extractor_dispatch_match(extractor, reader, depth, i, control));
                     if (*control) {
                         SUCCEED(); // TODO do what? There are still more predicates to match for this value.
                     }

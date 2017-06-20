@@ -194,9 +194,24 @@ static inline ION_EXTRACTOR_CONTROL ion_extractor_control_next()
 /**
  * Callback function to be invoked when the extractor matches a path.
  *
+ * The callback receives the matcher's ion_reader, positioned on the matching value, so that it can query the value's
+ * ion_type and to use the appropriate ion_reader function to read the matched value.
+ * Callback implementations MUST comply with the following:
+ * <ul>
+ *  <li>
+ *    The reader must not be advanced past the matching value. Violating this will cause the following value to be
+ *    skipped. If a value is skipped, neither the value itself nor any of its children will be checked for match against
+ *    any of the extractor's registered paths.
+ *  </li>
+ *  <li>
+ *    If the reader is positioned on a container value, its cursor must be at the same depth when the callback returns.
+ *    In other words, if the user steps in to the match value, it must step out an equal number of times. Violating
+ *    this will raise an error.
+ *  </li>
+ * </ul>
+ *
  * @param reader - The reader provided to the matching extractor through `ion_extractor_match`, positioned on the
- *  matching value. This allows the callback implementation to query the value's ion_type and to use the appropriate
- *  ion_reader function to read the matched value.
+ *  matching value.
  * @param matched_path - The path that was matched. This will be reference-equivalent to one of the extractor's
  *  registered paths.
  * @param user_context - User context data, reference-equivalent to the user_context provided for matched_path during
@@ -221,6 +236,9 @@ ION_API_EXPORT iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTI
  * Registers the given callback and user context to a new empty path. To finish constructing the path, the user
  * must append exactly `path_length` components to the resulting path before calling `ion_extractor_match` on this
  * extractor.
+ *
+ * NOTE: registering a sub-path of another registered path is not supported. For example, if the path `(foo bar)` is
+ * registered to a given extractor, the path `(foo bar 2)` should not be registered to the same extractor.
  *
  * @param extractor - An extractor which has already been opened by calling `ion_extractor_open`.
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.
