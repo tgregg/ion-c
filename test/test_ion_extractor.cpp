@@ -114,6 +114,24 @@ iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, v
     iRETURN;
 }
 
+/**
+ * Callback that can be used in tests that don't need to make assertions in the callback.
+ */
+iERR testCallbackBasic(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    iRETURN;
+}
+
+
+/**
+ * Callback that can be used in tests that expect a callback to never be invoked. Simply raises an error.
+ */
+iERR testCallbackNeverInvoked(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    FAILWITH(IERR_INVALID_STATE);
+    iRETURN;
+}
+
 void assertMatchesByFieldAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING value;
     ION_TYPE type;
@@ -346,6 +364,44 @@ TEST(IonExtractor, MatchesMultiplePathsFromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
 }
 
+TEST(IonExtractor, MatchesMultiplePathsCreatedUpFront) {
+    ION_EXTRACTOR_TEST_INIT;
+    hPATH path2, path3;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}, baz:def}";
+    ION_STRING abc_field, foo_field, bar_field;
+
+    ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
+    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
+    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
+
+    // Create paths up front.
+    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 3, &testCallback, assertion_context, &path));
+    assertion = &assertMatchesByFieldAtDepth1;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 1, &testCallback, assertion_context, &path2));
+
+    // Interleave path component appending between the paths.
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path2, &abc_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
+    assertion = &assertMatchesByFieldAtDepth1;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create_from_ion(extractor, &testCallback, assertion_context, (BYTE *)"(baz)", 5, &path3));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
+
+    assertion_contexts[path->path_id].path = path;
+    assertion_contexts[path2->path_id].path = path2;
+    assertion_contexts[path3->path_id].path = path3;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path->path_id, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path2->path_id, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path3->path_id, 1);
+
+}
+
 void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING str_value;
     int int_value;
@@ -423,46 +479,158 @@ TEST(IonExtractor, DoesNotMatchPathFromIon) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 0); // Matched zero times.
 }
 
-TEST(IonExtractor, FailsOnTooLargeMaxPathLength) {
-    iERR err;
+TEST(IonExtractorFailsOn, TooLargeMaxPathLength) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH + 1;
     options.max_num_paths = ION_EXTRACTOR_MAX_NUM_PATHS;
-
-    err = ion_extractor_open(&extractor, &options);
-    ASSERT_FALSE(IERR_OK == err);
+    ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractor, FailsOnTooLargeMaxNumPaths) {
-    iERR err;
+TEST(IonExtractorFailsOn, TooLargeMaxNumPaths) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH;
     options.max_num_paths = ION_EXTRACTOR_MAX_NUM_PATHS + 1;
-
-    err = ion_extractor_open(&extractor, &options);
-    ASSERT_FALSE(IERR_OK == err);
+    ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractor, FailsOnTooSmallMaxPathLength) {
-    iERR err;
+TEST(IonExtractorFailsOn, TooSmallMaxPathLength) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = 0;
     options.max_num_paths = ION_EXTRACTOR_MAX_NUM_PATHS;
-
-    err = ion_extractor_open(&extractor, &options);
-    ASSERT_FALSE(IERR_OK == err);
+    ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractor, FailsOnTooSmallMaxNumPaths) {
-    iERR err;
+TEST(IonExtractorFailsOn, TooSmallMaxNumPaths) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH;
     options.max_num_paths = 0;
-
-    err = ion_extractor_open(&extractor, &options);
-    ASSERT_FALSE(IERR_OK == err);
+    ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
+
+TEST(IonExtractorFailsOn, PathSizeZero) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_FAIL(ion_extractor_path_create(extractor, 0, &testCallbackNeverInvoked, NULL, &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, PathExceedsDeclaredLength) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 1, &testCallbackBasic, NULL, &path));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 1));
+    ION_ASSERT_FAIL(ion_extractor_path_append_ordinal(path, 0));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, PathExceedsMaxLength) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = 1;
+    options.max_num_paths = ION_EXTRACTOR_MAX_NUM_PATHS;
+    ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
+    ION_ASSERT_FAIL(ion_extractor_path_create(extractor, 2, &testCallbackBasic, NULL, &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, IncompletePath) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    hREADER reader;
+    ION_ASSERT_OK(ion_test_new_text_reader("[1, [1, 2], 3]", &reader));
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 3, &testCallbackBasic, NULL, &path));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 1));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 0));
+    ION_ASSERT_FAIL(ion_extractor_match(extractor, reader));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+    ION_ASSERT_OK(ion_reader_close(reader));
+}
+
+TEST(IonExtractorFailsOn, TooManyRegisteredPaths) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH;
+    options.max_num_paths = 1;
+    ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 1, &testCallbackBasic, NULL, &path));
+    ION_ASSERT_FAIL(ion_extractor_path_create(extractor, 1, &testCallbackNeverInvoked, NULL, &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, PathAppendWithoutCreate) {
+    hEXTRACTOR extractor;
+    ION_EXTRACTOR_PATH_DESCRIPTOR *path = (ION_EXTRACTOR_PATH_DESCRIPTOR *)malloc(sizeof(ION_EXTRACTOR_PATH_DESCRIPTOR));
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    path->path_id = 0;
+    path->_current_length = 0;
+    path->path_length = 1;
+    path->extractor = extractor;
+    ION_ASSERT_FAIL(ion_extractor_path_append_ordinal(path, 2));
+    free(path);
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, CreatePathFromIonWithMoreThanOneTopLevelValue) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    const char *data = "(foo) 123";
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_FAIL(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)data, strlen(data), &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, CreatePathFromIonWithZeroPathComponents) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    const char *data = "()";
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_FAIL(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)data, strlen(data), &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, CreatePathFromIonNotSequence) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    const char *data = "abc";
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_FAIL(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)data, strlen(data), &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, CreatePathFromIonPathExceedsMaxLength) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    const char *data = "(foo bar)";
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = 1;
+    options.max_num_paths = ION_EXTRACTOR_MAX_NUM_PATHS;
+    ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
+    ION_ASSERT_FAIL(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)data, strlen(data), &path));
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, AppendAfterCreatePathFromIon) {
+    hEXTRACTOR extractor;
+    hPATH path;
+    const char *data = "(foo bar)";
+    ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+    ION_ASSERT_OK(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)data, strlen(data), &path));
+    ION_ASSERT_FAIL(ion_extractor_path_append_ordinal(path, 2)); // This will exceed the path's declared length.
+    ION_ASSERT_OK(ion_extractor_close(extractor));
+}
+
+TEST(IonExtractorFailsOn, ReaderStartingAtDepthOtherThanZero) {
+
+}
+
+// TODO fail on reader starting at depth != 0
+// TODO fail on reader being returned from callback at different depth

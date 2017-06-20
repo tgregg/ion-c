@@ -24,6 +24,15 @@ extern "C" {
 #endif
 
 /**
+ * A bit map representing matching paths at a particular path depth. If the bit at index N is set, it means the path
+ * with ID = N is active. If zero, there are no paths active at this depth, and the extractor is free to skip and step
+ * out.
+ * NOTE: This is coupled to the ION_EXTRACTOR_DEFAULT_MAX_NUM_PATHS_LIMIT: one bit for each possible
+ * path. Raising that limit (or making it configurable) will require a different strategy for tracking active paths.
+ */
+typedef uint_fast64_t ION_EXTRACTOR_ACTIVE_PATH_MAP;
+
+/**
  * A descriptor for a path for the extractor to match.
  */
 struct _ion_extractor_path_descriptor {
@@ -36,6 +45,12 @@ struct _ion_extractor_path_descriptor {
      * The number of components in the path.
      */
     ION_EXTRACTOR_SIZE path_length;
+
+    /**
+     * The current length of the path. In order for the path to be valid, this must be equivalent to `path_length` when
+     * the user is finished building the path.
+     */
+    ION_EXTRACTOR_SIZE _current_length;
 
     /**
      * The extractor to which this path is registered.
@@ -130,15 +145,11 @@ struct _ion_extractor {
     ION_EXTRACTOR_OPTIONS options;
 
     /**
-     * TRUE if the user has started, but not finished, a path. When TRUE, the user cannot start another path or start
-     * matching.
+     * Nonzero if the user has started, but not finished, a path. When nonzero, the user cannot start matching.
+     * When bit i is set, the path with path_id=i is in progress, meaning that its actual length does not match its
+     * declared length.
      */
-    bool _path_in_progress;
-
-    /**
-     * The length of the current path. Only valid when `_path_in_progress` is TRUE.
-     */
-    ION_EXTRACTOR_SIZE _cur_path_len;
+    ION_EXTRACTOR_ACTIVE_PATH_MAP _path_in_progress;
 
     /**
      * Path components from all registered paths organized by depth. Components at depth 1 begin at index 0, components
