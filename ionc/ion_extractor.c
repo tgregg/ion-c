@@ -20,7 +20,8 @@
 #define ION_EXTRACTOR_GET_COMPONENT(extractor, path_depth, path_index) \
     &extractor->path_components[(path_depth - extractor->_initial_depth) * extractor->options.max_num_paths + path_index]
 
-#define ION_EXTRACTOR_WILDCARD_ANNOTATION "$ion_wildcard"
+#define ION_EXTRACTOR_FIELD_ANNOTATION "$ion_extractor_field"
+#define ION_EXTRACTOR_WILDCARD "*"
 
 iERR ion_extractor_open(hEXTRACTOR *extractor, ION_EXTRACTOR_OPTIONS *options) {
     iENTER;
@@ -168,7 +169,7 @@ iERR ion_extractor_path_create_from_ion(ION_EXTRACTOR *extractor, ION_EXTRACTOR_
     ION_READER *reader = NULL;
     ION_READER_OPTIONS options;
     ION_TYPE type;
-    ION_STRING text, wildcard_annotation;
+    ION_STRING text, field_annotation, wildcard;
     BOOL has_annotations;
     ION_EXTRACTOR_PATH_COMPONENT components[ION_EXTRACTOR_MAX_PATH_LENGTH], *component;
     ION_EXTRACTOR_SIZE path_length = 0, i;
@@ -179,8 +180,10 @@ iERR ion_extractor_path_create_from_ion(ION_EXTRACTOR *extractor, ION_EXTRACTOR_
     ASSERT(ion_data_length > 0);
     ASSERT(p_path);
 
-    wildcard_annotation.value = (BYTE *)ION_EXTRACTOR_WILDCARD_ANNOTATION;
-    wildcard_annotation.length = (int32_t)strlen(ION_EXTRACTOR_WILDCARD_ANNOTATION);
+    field_annotation.value = (BYTE *)ION_EXTRACTOR_FIELD_ANNOTATION;
+    field_annotation.length = (int32_t)strlen(ION_EXTRACTOR_FIELD_ANNOTATION);
+    wildcard.value = (BYTE *)ION_EXTRACTOR_WILDCARD;
+    wildcard.length = 1;
 
     memset(&options, 0, sizeof(ION_READER_OPTIONS));
     options.max_container_depth = (extractor->options.max_path_length < MIN_WRITER_STACK_DEPTH)
@@ -205,17 +208,19 @@ iERR ion_extractor_path_create_from_ion(ION_EXTRACTOR *extractor, ION_EXTRACTOR_
                 break;
             case tid_SYMBOL_INT:
             case tid_STRING_INT:
-                IONCHECK(ion_reader_has_any_annotations(reader, &has_annotations));
-                if (has_annotations) {
-                    IONCHECK(ion_reader_get_an_annotation(reader, 0, &text));
-                    if (ION_STRING_EQUALS(&wildcard_annotation, &text)) {
-                        component->type = WILDCARD;
-                        break;
-                    }
-                }
-                component->type = FIELD;
                 IONCHECK(ion_reader_read_string(reader, &text));
                 IONCHECK(ion_string_copy_to_owner(extractor, &component->value.text, &text));
+                component->type = FIELD;
+                if (ION_STRING_EQUALS(&wildcard, &text)) {
+                    IONCHECK(ion_reader_has_any_annotations(reader, &has_annotations));
+                    if (has_annotations) {
+                        IONCHECK(ion_reader_get_an_annotation(reader, 0, &text));
+                        if (ION_STRING_EQUALS(&field_annotation, &text)) {
+                            break;
+                        }
+                    }
+                    component->type = WILDCARD;
+                }
                 break;
             default:
                 FAILWITHMSG(IERR_INVALID_ARG, "Improper path format.");

@@ -306,16 +306,18 @@ ION_API_EXPORT iERR ion_extractor_path_append_wildcard(hPATH path);
  * Registers a path from text or binary Ion data. The data must contain exactly one top-level value: an ordered sequence
  * (list or sexp) containing a number of elements less than or equal to the extractor's `max_path_length`. The elements
  * must be either text types (string or symbol), representing fields or wildcards, or integers, representing ordinals.
- * In order for a text value to represent a wildcard, it must be annotated with the special annotation `$ion_wildcard`
- * as its first annotation, and must have text corresponding to one of the supported wildcards (currently only `*`).
- * This is to allow paths to match fields with the same text as a wildcard.
+ * In order for a text value to represent a wildcard, it must be equivalent to one of the supported wildcards (currently
+ * only `*`). Field elements with the same text as a wildcard must be annotated with the special annotation
+ * `$ion_extractor_field` as its first annotation.
  * For example,
  *  <pre>
- *    (abc $ion_wildcard::'*' def 2)
+ *    (abc * 2 $ion_extractor_field::'*')
  *  </pre>
- * represents a path of length 4 consisting of a field, wildcard, field, and ordinal.
+ * represents a path of length 4 consisting of a field named `abc`, a wildcard, an ordinal with value 2, and a field
+ * named `*`.
+ *
  * NOTE: this is a standalone function that does not require a call to `ion_extractor_path_create`. However, other paths
- * registered to the same extractor may be constructed using that functions.
+ * registered to the same extractor may be constructed using that function.
  *
  * @param extractor - An extractor which has already been opened by calling `ion_extractor_open`.
  * @param callback - The callback function to be invoked by the extractor when the given path is matched.

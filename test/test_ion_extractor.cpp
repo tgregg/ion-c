@@ -292,7 +292,7 @@ TEST(IonExtractor, MatchesByWildcardFromIon) {
     assertion = &assertMatchesByWildcard;
     // TODO leaving the * unquoted here should be legal, but it fails to parse. This needs to be fixed in the core
     // library.
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar $ion_wildcard::'*')");
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar *)");
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
@@ -303,7 +303,7 @@ TEST(IonExtractor, MatchesByWildcardWithFieldNameStar) {
     const char *ion_text = "{abc: def, foo: {'*':[1, 2, 3]}}";
 
     assertion = &assertMatchesByWildcard;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo '*' $ion_wildcard::'*')");
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo $ion_extractor_field::'*' *)");
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
@@ -325,7 +325,7 @@ TEST(IonExtractor, MatchesByNonTerminalWildcard) {
     const char *ion_text = "{abc: def, foo: {bar:[{baz:1}, {zar:2}, {baz:3}]}}";
 
     assertion = &assertMatchesByNonTerminalWildcard;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar $ion_wildcard::'*' baz)");
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar * baz)");
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
