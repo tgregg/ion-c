@@ -147,8 +147,7 @@ typedef struct _ion_extractor_options {
      * relative to the initial depth of the reader at the start of `ion_extractor_match`. For example, if a reader
      * positioned at depth 2 at the field 'foo' in the data `{abc:{foo:{bar:baz}}}` is provided to an extractor with
      * `match_relative_paths=true` and a the registered path `(bar)`, the extractor would match on the value `baz`. This
-     * extractor would finish matching once it exhausts all sibling values (none in this case) at its initial depth
-     * of 1.
+     * extractor would finish matching once it exhausted all sibling values (none in this case) at depth 2.
      *
      * If `false`, the extractor requires a reader positioned at depth 0.
      *
@@ -220,7 +219,7 @@ static inline ION_EXTRACTOR_CONTROL ion_extractor_control_next()
  *  </li>
  *  <li>
  *    If the reader is positioned on a container value, its cursor must be at the same depth when the callback returns.
- *    In other words, if the user steps in to the match value, it must step out an equal number of times. Violating
+ *    In other words, if the user steps in to the matched value, it must step out an equal number of times. Violating
  *    this will raise an error.
  *  </li>
  * </ul>
@@ -336,6 +335,12 @@ ION_API_EXPORT iERR ion_extractor_path_create_from_ion(hEXTRACTOR extractor, ION
 
 /**
  * Extracts matches within the data read by the extractor's reader using the extractor's registered paths.
+ *
+ * The given reader should be positioned before the first value to be processed. Unless
+ * `extractor.options.match_relative_paths` is true, this must be at depth 0. Otherwise, this may be at any valid depth
+ * within the data. In order to avoid skipping any values at a particular non-zero depth, the reader should be navigated
+ * to that depth using `ion_reader_step_in` NOT followed by `ion_reader_next`.
+ *
  * @param extractor - The extractor to match.
  * @param reader - A pre-allocated reader, which has already been opened by calling `ion_reader_open_*`.
  * @return a non-zero error code in the case of failure (including any underlying parsing failures), otherwise IERR_OK.

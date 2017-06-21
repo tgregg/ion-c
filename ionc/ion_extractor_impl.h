@@ -86,14 +86,14 @@ typedef enum _ion_extractor_path_component_type {
  */
 typedef struct _ion_extractor_path_component {
     /**
-     * Zero (FALSE) if there are more components in the path; non-zero (TRUE) if this is the last component in the path.
+     * `false` if there are more components in the path; `true` if this is the last component in the path.
      * If this component is terminal and it matches the current value, the matcher's callback should be
      * invoked. If it is not terminal, but it matches the current element, then the matcher should remain active
      * at this depth. If this component doesn't match the current element, it should be marked inactive.
      *
-     * NOTE: it is possible to calculate whether a component is terminal (TRUE if the component's depth is equal to the
-     * matcher's path's length), but storing it may be cheaper, as calculating it would require accessing the matcher's
-     * path's length in a disparate memory location each time a component is accessed.
+     * NOTE: it is possible to calculate whether a component is terminal (`true` if the component's depth is equal to
+     * the matcher's path's length), but storing it may be cheaper, as calculating it would require accessing the
+     * matcher's path's length in a disparate memory location each time a component is accessed.
      */
     bool is_terminal;
 
