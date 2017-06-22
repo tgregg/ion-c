@@ -363,8 +363,6 @@ TEST(IonExtractorSucceedsWhen, WildcardMatchesFromIon) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
 
-    // TODO leaving the * unquoted here should be legal, but it fails to parse. This needs to be fixed in the core
-    // library.
     ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar *)", &assertMatchesAnyInt1to3);
 
     ION_EXTRACTOR_TEST_MATCH;
@@ -375,7 +373,7 @@ TEST(IonExtractorSucceedsWhen, WildcardAndFieldNamedStarMatches) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc: def, foo: {'*':[1, 2, 3]}}";
 
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo $ion_extractor_field::'*' *)", &assertMatchesAnyInt1to3);
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo $ion_extractor_field::* *)", &assertMatchesAnyInt1to3);
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);

@@ -310,7 +310,7 @@ ION_API_EXPORT iERR ion_extractor_path_append_wildcard(hPATH path);
  * `$ion_extractor_field` as its first annotation.
  * For example,
  *  <pre>
- *    (abc * 2 $ion_extractor_field::'*')
+ *    (abc * 2 $ion_extractor_field::*)
  *  </pre>
  * represents a path of length 4 consisting of a field named `abc`, a wildcard, an ordinal with value 2, and a field
  * named `*`.
