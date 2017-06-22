@@ -323,6 +323,7 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
     // depths above the max path length are rejected at construction.
     ASSERT(depth <= extractor->options.max_path_length);
 
+    *control = ion_extractor_control_next();
     for (i = 0; i < extractor->matchers_length; i++) {
         if (previous_depth_actives & (1 << i)) {
             path_component = ION_EXTRACTOR_GET_COMPONENT(extractor, depth - 1, i);
@@ -331,7 +332,10 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
                 if (path_component->is_terminal) {
                     IONCHECK(_ion_extractor_dispatch_match(extractor, reader, depth, i, control));
                     if (*control) {
-                        SUCCEED(); // TODO do what? There are still more predicates to match for this value.
+                        if (*control > (depth - extractor->_initial_depth)) {
+                            FAILWITHMSG(IERR_INVALID_STATE, "Received a control instruction to step out past current depth.")
+                        }
+                        SUCCEED();
                     }
                 }
                 *current_depth_actives |= (1 << i);
@@ -343,11 +347,11 @@ iERR _ion_extractor_evaluate_predicates(ION_EXTRACTOR *extractor, ION_READER *re
 }
 
 iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE depth,
-                                 ION_EXTRACTOR_ACTIVE_PATH_MAP previous_depth_actives) {
+                                 ION_EXTRACTOR_ACTIVE_PATH_MAP previous_depth_actives,
+                                 ION_EXTRACTOR_CONTROL *control) {
     iENTER;
     ION_TYPE t;
     POSITION ordinal = 0;
-    ION_EXTRACTOR_CONTROL control = ion_extractor_control_next();
     ION_EXTRACTOR_ACTIVE_PATH_MAP current_depth_actives;
 
     for (;;) {
@@ -358,15 +362,18 @@ iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE 
         // Each value at depth N can match any active partial path from depth N - 1.
         current_depth_actives = 0;
         if (depth - extractor->_initial_depth > 0) {
-            IONCHECK(_ion_extractor_evaluate_predicates(extractor, reader, depth, ordinal, &control,
+            IONCHECK(_ion_extractor_evaluate_predicates(extractor, reader, depth, ordinal, control,
                                                         previous_depth_actives, &current_depth_actives));
+            if (*control) {
+                *control -= 1;
+                SUCCEED();
+            }
         }
         else {
             ASSERT(depth - extractor->_initial_depth == 0);
             // Everything matches at depth 0.
             current_depth_actives = ION_EXTRACTOR_ALL_PATHS_ACTIVE;
         }
-        // TODO do what with control?
         ordinal++;
         switch(ION_TYPE_INT(t)) {
             case tid_NULL_INT:
@@ -385,8 +392,12 @@ iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE 
             case tid_STRUCT_INT:
                 if (current_depth_actives != 0) {
                     IONCHECK(ion_reader_step_in(reader));
-                    IONCHECK(_ion_extractor_match_helper(extractor, reader, depth + 1, current_depth_actives));
+                    IONCHECK(_ion_extractor_match_helper(extractor, reader, depth + 1, current_depth_actives, control));
                     IONCHECK(ion_reader_step_out(reader));
+                    if (*control) {
+                        *control -= 1;
+                        SUCCEED();
+                    }
                 }
                 continue;
             default:
@@ -400,6 +411,7 @@ iERR _ion_extractor_match_helper(hEXTRACTOR extractor, ION_READER *reader, SIZE 
 iERR ion_extractor_match(ION_EXTRACTOR *extractor, ION_READER *reader) {
     iENTER;
     SIZE depth;
+    ION_EXTRACTOR_CONTROL control = ion_extractor_control_next();
 
     ASSERT(extractor);
     ASSERT(reader);
@@ -414,7 +426,7 @@ iERR ion_extractor_match(ION_EXTRACTOR *extractor, ION_READER *reader) {
     }
     extractor->_initial_depth = depth;
     if (extractor->matchers_length) {
-        IONCHECK(_ion_extractor_match_helper(extractor, reader, depth, 0));
+        IONCHECK(_ion_extractor_match_helper(extractor, reader, depth, 0, &control));
     }
     iRETURN;
 }

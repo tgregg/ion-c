@@ -12,11 +12,9 @@
  * language governing permissions and limitations under the License.
  */
 
-#include <ion_extractor_impl.h>
+#include "ion_extractor_impl.h"
 #include "ion_assert.h"
-#include "ion_helpers.h"
 #include "ion_test_util.h"
-#include "ion_extractor.h"
 
 /**
  * Max number of paths and path lengths used in these tests. If more are needed, just increase these limits. Having
@@ -24,6 +22,10 @@
  */
 #define ION_EXTRACTOR_TEST_MAX_PATHS 5
 #define ION_EXTRACTOR_TEST_PATH_LENGTH 5
+
+/* -----------------------
+ * Extractor test utilities (for reduction of boilerplate).
+ */
 
 /**
  * Initializes an extractor test with the given options.
@@ -79,13 +81,35 @@
     ION_EXTRACTOR_TEST_PATH_END;
 
 /**
- * Generic execution of an extractor for extractor tests. A const char * named `ion_text` must be declared first.
+ * Generic execution and cleanup of an extractor over the provided reader.
  */
-#define ION_EXTRACTOR_TEST_MATCH \
-    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader)); \
+#define ION_EXTRACTOR_TEST_MATCH_READER(ion_reader) \
     ION_ASSERT_OK(ion_extractor_match(extractor, reader)); \
     ION_ASSERT_OK(ion_extractor_close(extractor)); \
     ION_ASSERT_OK(ion_reader_close(reader));
+
+/**
+ * Generic execution and cleanup of an extractor. A const char * named `ion_text` must be declared first.
+ */
+#define ION_EXTRACTOR_TEST_MATCH \
+    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader)); \
+    ION_EXTRACTOR_TEST_MATCH_READER(reader);
+
+/**
+ * Generic execution and cleanup of an extractor that is expected to fail when matched over the provided reader.
+ */
+#define ION_EXTRACTOR_TEST_MATCH_READER_EXPECT_FAILURE(ion_reader) \
+    ION_ASSERT_FAIL(ion_extractor_match(extractor, reader)); \
+    ION_ASSERT_OK(ion_extractor_close(extractor)); \
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+/**
+ * Generic execution and cleanup of an extractor that is expected to fail. A const char * named `ion_text` must be
+ * declared first.
+ */
+#define ION_EXTRACTOR_TEST_MATCH_EXPECT_FAILURE \
+    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader)); \
+    ION_EXTRACTOR_TEST_MATCH_READER_EXPECT_FAILURE(reader);
 
 /**
  * Asserts that the path at the given index matched n times. Paths are indexed in the order they are added, starting
@@ -109,37 +133,12 @@ typedef struct _assertion_context {
     int num_matches;
 } ASSERTION_CONTEXT;
 
-/**
- * Callback that can be used for path extractor tests. Treats user_context as an ASSERT_MATCHES function pointer,
- * and invokes that function.
+/* -----------------------
+ * Test assertions (with ASSERT_MATCHES signatures).
  */
-iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
-    iENTER;
-    ASSERTION_CONTEXT *assertion_context = (ASSERTION_CONTEXT *)user_context;
-    assertion_context->assertion(reader, matched_path, assertion_context->path, control);
-    assertion_context->num_matches++;
-    iRETURN;
-}
 
-/**
- * Callback that can be used in tests that don't need to make assertions in the callback.
- */
-iERR testCallbackBasic(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
-    iENTER;
-    iRETURN;
-}
-
-
-/**
- * Callback that can be used in tests that expect a callback to never be invoked. Simply raises an error.
- */
-iERR testCallbackNeverInvoked(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, void *user_context, ION_EXTRACTOR_CONTROL *control) {
-    iENTER;
-    FAILWITH(IERR_INVALID_STATE);
-    iRETURN;
-}
-
-void assertMatchesByFieldAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesTextDEF(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                          ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING value;
     ION_TYPE type;
 
@@ -150,62 +149,14 @@ void assertMatchesByFieldAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR 
     assertStringsEqual("def", (char *)value.value, value.length);
 }
 
-TEST(IonExtractor, MatchesByFieldAtDepth1) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-    ION_STRING value;
-    ION_ASSERT_OK(ion_string_from_cstr("abc", &value));
-
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START(1);
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &value));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+void assertMatchesTextDEFThenStepOut2(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                                      ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+    assertMatchesTextDEF(reader, matched_path, original_path, control);
+    *control = ion_extractor_control_step_out(2);
 }
 
-TEST(IonExtractor, MatchesByFieldAtDepth1FromIon) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-}
-
-void assertMatchesByOrdinalAtDepth1(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
-    // It happens to match the same field.
-    assertMatchesByFieldAtDepth1(reader, matched_path, original_path, control);
-}
-
-TEST(IonExtractor, MatchesByOrdinalAtDepth1) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByOrdinalAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START(1);
-    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 0));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-}
-
-TEST(IonExtractor, MatchesByOrdinalAtDepth1FromIon) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByOrdinalAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(0)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-}
-
-void assertMatchesByFieldAndOrdinalAtDepth3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesInt3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                       ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -216,47 +167,14 @@ void assertMatchesByFieldAndOrdinalAtDepth3(hREADER reader, ION_EXTRACTOR_PATH_D
     ASSERT_EQ(3, value);
 }
 
-TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-    ION_STRING foo_field, bar_field;
-    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
-    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
-
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_START(3);
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
-    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+void assertMatchesInt3ThenStepOut2(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                                   ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+    assertMatchesInt3(reader, matched_path, original_path, control);
+    *control = ion_extractor_control_step_out(2);
 }
 
-TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIon) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 2)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-}
-
-TEST(IonExtractor, MatchesByFieldAndOrdinalAtDepth3FromIonAlternate) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("['foo', \"bar\", abc::2]");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-}
-
-void assertMatchesByWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesAnyInt1to3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                             ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -267,49 +185,8 @@ void assertMatchesByWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matc
     ASSERT_TRUE(value == 1 || value == 2 || value == 3);
 }
 
-TEST(IonExtractor, MatchesByWildcard) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-    ION_STRING foo_field, bar_field;
-    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
-    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
-
-    assertion = &assertMatchesByWildcard;
-    ION_EXTRACTOR_TEST_PATH_START(3);
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
-    ION_ASSERT_OK(ion_extractor_path_append_wildcard(path));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
-}
-
-TEST(IonExtractor, MatchesByWildcardFromIon) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByWildcard;
-    // TODO leaving the * unquoted here should be legal, but it fails to parse. This needs to be fixed in the core
-    // library.
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar *)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
-}
-
-TEST(IonExtractor, MatchesByWildcardWithFieldNameStar) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {'*':[1, 2, 3]}}";
-
-    assertion = &assertMatchesByWildcard;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo $ion_extractor_field::'*' *)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
-}
-
-void assertMatchesByNonTerminalWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesInt1or3(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                          ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     int value;
     ION_TYPE type;
 
@@ -320,96 +197,8 @@ void assertMatchesByNonTerminalWildcard(hREADER reader, ION_EXTRACTOR_PATH_DESCR
     ASSERT_TRUE(value == 1 || value == 3);
 }
 
-TEST(IonExtractor, MatchesByNonTerminalWildcard) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[{baz:1}, {zar:2}, {baz:3}]}}";
-
-    assertion = &assertMatchesByNonTerminalWildcard;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar * baz)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
-}
-
-TEST(IonExtractor, MatchesMultiplePaths) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-    ION_STRING abc_field, foo_field, bar_field;
-    ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
-    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
-    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
-
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_START(3);
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
-    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_START(1);
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &abc_field));
-    ION_EXTRACTOR_TEST_PATH_END;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
-}
-
-TEST(IonExtractor, MatchesMultiplePathsFromIon) {
-    ION_EXTRACTOR_TEST_INIT;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
-
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 2)");
-
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
-}
-
-TEST(IonExtractor, MatchesMultiplePathsCreatedUpFront) {
-    ION_EXTRACTOR_TEST_INIT;
-    hPATH path2, path3;
-    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}, baz:def}";
-    ION_STRING abc_field, foo_field, bar_field;
-
-    ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
-    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
-    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
-
-    // Create paths up front.
-    assertion = &assertMatchesByFieldAndOrdinalAtDepth3;
-    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
-    ION_ASSERT_OK(ion_extractor_path_create(extractor, 3, &testCallback, assertion_context, &path));
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
-    ION_ASSERT_OK(ion_extractor_path_create(extractor, 1, &testCallback, assertion_context, &path2));
-
-    // Interleave path component appending between the paths.
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
-    ION_ASSERT_OK(ion_extractor_path_append_field(path2, &abc_field));
-    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
-    assertion = &assertMatchesByFieldAtDepth1;
-    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
-    ION_ASSERT_OK(ion_extractor_path_create_from_ion(extractor, &testCallback, assertion_context, (BYTE *)"(baz)", 5, &path3));
-    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
-
-    assertion_contexts[path->path_id].path = path;
-    assertion_contexts[path2->path_id].path = path2;
-    assertion_contexts[path3->path_id].path = path3;
-
-    ION_EXTRACTOR_TEST_MATCH;
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path->path_id, 1);
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path2->path_id, 1);
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path3->path_id, 1);
-
-}
-
-void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesTextDEForInt123(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                                  ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
     ION_STRING str_value;
     int int_value;
     ION_TYPE type;
@@ -427,13 +216,292 @@ void assertMatchesSamePathMultipleTimes(hREADER reader, ION_EXTRACTOR_PATH_DESCR
     }
 }
 
-TEST(IonExtractor, MatchesSamePathMultipleTimes) {
+void assertPathNeverMatches(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                            ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+    ASSERT_FALSE(TRUE) << "Path with ID " << matched_path->path_id << " matched when it should not have.";
+}
+
+/* -----------------------
+ * Test callbacks
+ */
+
+/**
+ * Treats user_context as an ASSERT_MATCHES function pointer and invokes that function.
+ */
+iERR testCallback(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                  void *user_context, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    ASSERTION_CONTEXT *assertion_context = (ASSERTION_CONTEXT *)user_context;
+    assertion_context->assertion(reader, matched_path, assertion_context->path, control);
+    assertion_context->num_matches++;
+    iRETURN;
+}
+
+/**
+ * Useful for tests that don't need to make assertions in the callback.
+ */
+iERR testCallbackBasic(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                       void *user_context, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    iRETURN;
+}
+
+/**
+ * Useful for tests that expect a callback to never be invoked. Simply raises an error.
+ */
+iERR testCallbackNeverInvoked(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                              void *user_context, ION_EXTRACTOR_CONTROL *control) {
+    iENTER;
+    FAILWITH(IERR_INVALID_STATE);
+    iRETURN;
+}
+
+/* -----------------------
+ * Success tests
+ */
+
+TEST(IonExtractorSucceedsWhen, FieldAtDepth1Matches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+    ION_STRING value;
+    ION_ASSERT_OK(ion_string_from_cstr("abc", &value));
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &value));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, FieldAtDepth1MatchesFromIon) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, OrdinalAtDepth1Matches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 0));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, OrdinalAtDepth1MatchesFromIon) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(0)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, FieldAndOrdinalAtDepth3Matches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+    ION_STRING foo_field, bar_field;
+    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
+    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
+
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, FieldAndOrdinalAtDepth3MatchesFromIon) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 2)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, FieldAndOrdinalAtDepth3MatchesFromIonAlternate) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("['foo', \"bar\", abc::2]");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, WildcardMatches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+    ION_STRING foo_field, bar_field;
+    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
+    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
+
+    assertion = &assertMatchesAnyInt1to3;
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_path_append_wildcard(path));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+}
+
+TEST(IonExtractorSucceedsWhen, WildcardMatchesFromIon) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesAnyInt1to3;
+    // TODO leaving the * unquoted here should be legal, but it fails to parse. This needs to be fixed in the core
+    // library.
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar *)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+}
+
+TEST(IonExtractorSucceedsWhen, WildcardAndFieldNamedStarMatches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {'*':[1, 2, 3]}}";
+
+    assertion = &assertMatchesAnyInt1to3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo $ion_extractor_field::'*' *)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+}
+
+TEST(IonExtractorSucceedsWhen, NonTerminalWildcardMatches) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[{baz:1}, {zar:2}, {baz:3}]}}";
+
+    assertion = &assertMatchesInt1or3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar * baz)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+}
+
+TEST(IonExtractorSucceedsWhen, MultiplePathsMatch) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+    ION_STRING abc_field, foo_field, bar_field;
+    ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
+    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
+    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
+
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_START(3);
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_START(1);
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &abc_field));
+    ION_EXTRACTOR_TEST_PATH_END;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, MultiplePathsMatchFromIon) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
+
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 2)");
+
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, MultiplePathsMatchOnTheSameValue) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "[1, 2, 3]";
+
+    assertion = &assertMatchesAnyInt1to3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(*)");
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(2)");
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 3);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 1);
+}
+
+TEST(IonExtractorSucceedsWhen, MultiplePathsCreatedUpFrontMatch) {
+    ION_EXTRACTOR_TEST_INIT;
+    hPATH path2, path3;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}, baz:def}";
+    ION_STRING abc_field, foo_field, bar_field;
+
+    ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
+    ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
+    ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
+
+    // Create paths up front.
+    assertion = &assertMatchesInt3;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 3, &testCallback, assertion_context, &path));
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create(extractor, 1, &testCallback, assertion_context, &path2));
+
+    // Interleave path component appending between the paths.
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path2, &abc_field));
+    ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_NEXT_CONTEXT;
+    ION_ASSERT_OK(ion_extractor_path_create_from_ion(extractor, &testCallback, assertion_context, (BYTE *)"(baz)", 5, &path3));
+    ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 2));
+
+    assertion_contexts[path->path_id].path = path;
+    assertion_contexts[path2->path_id].path = path2;
+    assertion_contexts[path3->path_id].path = path3;
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path->path_id, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path2->path_id, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(path3->path_id, 1);
+
+}
+
+TEST(IonExtractorSucceedsWhen, TheSamePathMatchesMultipleTimes) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc:def}{abc:123}";
     ION_STRING abc_field;
     ION_ASSERT_OK(ion_string_from_cstr("abc", &abc_field));
 
-    assertion = &assertMatchesSamePathMultipleTimes;
+    assertion = &assertMatchesTextDEForInt123;
     ION_EXTRACTOR_TEST_PATH_START(1);
     ION_ASSERT_OK(ion_extractor_path_append_field(path, &abc_field));
     ION_EXTRACTOR_TEST_PATH_END;
@@ -442,29 +510,25 @@ TEST(IonExtractor, MatchesSamePathMultipleTimes) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
 }
 
-TEST(IonExtractor, MatchesSamePathMultipleTimesFromIon) {
+TEST(IonExtractorSucceedsWhen, TheSamePathMatchesMultipleTimesFromIon) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc:def}{abc:123}";
 
-    assertion = &assertMatchesSamePathMultipleTimes;
+    assertion = &assertMatchesTextDEForInt123;
     ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)")
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
 }
 
-void assertDoesNotMatchPath(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
-    ASSERT_FALSE(TRUE) << "Path with ID " << matched_path->path_id << " matched when it should not have.";
-}
-
-TEST(IonExtractor, DoesNotMatchPath) {
+TEST(IonExtractorSucceedsWhen, NoPathMatches) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
     ION_STRING foo_field, bar_field;
     ION_ASSERT_OK(ion_string_from_cstr("foo", &foo_field));
     ION_ASSERT_OK(ion_string_from_cstr("bar", &bar_field));
 
-    assertion = &assertDoesNotMatchPath;
+    assertion = &assertPathNeverMatches;
     ION_EXTRACTOR_TEST_PATH_START(3);
     ION_ASSERT_OK(ion_extractor_path_append_field(path, &foo_field));
     ION_ASSERT_OK(ion_extractor_path_append_field(path, &bar_field));
@@ -475,18 +539,118 @@ TEST(IonExtractor, DoesNotMatchPath) {
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 0); // Matched zero times.
 }
 
-TEST(IonExtractor, DoesNotMatchPathFromIon) {
+TEST(IonExtractorSucceedsWhen, NoPathMatchesFromIon) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
 
-    assertion = &assertDoesNotMatchPath;
+    assertion = &assertPathNeverMatches;
     ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 3)");
 
     ION_EXTRACTOR_TEST_MATCH;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 0); // Matched zero times.
 }
 
-TEST(IonExtractorFailsOn, TooLargeMaxPathLength) {
+TEST(IonExtractorSucceedsWhen, ARelativePathMatches) {
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = ION_EXTRACTOR_TEST_PATH_LENGTH;
+    options.max_num_paths = ION_EXTRACTOR_TEST_MAX_PATHS;
+    options.match_relative_paths = true;
+    ION_EXTRACTOR_TEST_INIT_OPTIONS(options);
+    ION_TYPE type;
+    // Step in the reader to point to the first 'bar' at depth 2. The extractor will process all siblings of depth 2,
+    // but will not step out past depth 2.
+    const char *ion_text = "{foo:{bar:{baz:1}, bar:{baz:3}}, foo{bar:{baz:2}}}";
+    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // {
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // foo
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader)); //bar
+    ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
+
+    assertion = &assertMatchesInt1or3;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(baz)"); // Matches 1 and 3
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar baz)"); // Never matches because the extractor is scoped at depth 2.
+
+    ION_EXTRACTOR_TEST_MATCH_READER(reader);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
+}
+
+TEST(IonExtractorSucceedsWhen, StepOutControlIsReceivedAfterMatch) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3, 4], baz:123}, abc: def}";
+
+    assertion = &assertMatchesInt3ThenStepOut2;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 2)");
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar 3)"); // Would match, except this is skipped by control.
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar baz)"); // Would match, except this is skipped by control.
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)"); // Matches twice.
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(2, 0);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(3, 2);
+}
+
+TEST(IonExtractorSucceedsWhen, StepOutControlIsReceivedAfterMatchOnRelativePath) {
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = ION_EXTRACTOR_TEST_PATH_LENGTH;
+    options.max_num_paths = ION_EXTRACTOR_TEST_MAX_PATHS;
+    options.match_relative_paths = true;
+    ION_EXTRACTOR_TEST_INIT_OPTIONS(options);
+    ION_TYPE type;
+    const char *ion_text = "{a:{foo:{baz:{abc:def}, zar:{ghi:jkl}}, bar:{baz:{abc:def}}}";
+    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // {
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // a
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader)); // foo (at depth 2)
+
+    assertion = &assertMatchesTextDEFThenStepOut2;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(baz abc)"); // Matches at foo and bar.
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(zar ghi)"); // Would match, except this is skipped by control.
+
+    // This scopes the extractor at depth 2. The callback will tell the extractor to step out 2 from depth 4, which
+    // will return the extractor to its initial depth of 2. It will then continue processing at that depth and match
+    // (baz abc) again at the 'bar' field.
+    ION_EXTRACTOR_TEST_MATCH_READER(reader);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
+
+}
+
+TEST(IonExtractorSucceedsWhen, StepOutControlIsReceivedAfterMatchOnWildcard) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def, foo: {bar:[3, 2, 1, 4], baz:123}, abc: def}";
+
+    assertion = &assertMatchesInt3ThenStepOut2;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar *)"); // Would match four times, but steps out after the first.
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar baz)"); // Would match, except this is skipped by control.
+    assertion = &assertMatchesTextDEF;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)"); // Matches twice.
+
+    ION_EXTRACTOR_TEST_MATCH;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(2, 2);
+}
+
+/* -----------------------
+ * Failure tests
+ */
+
+TEST(IonExtractorFailsWhen, MaxPathLengthExceedsLimit) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH + 1;
@@ -494,7 +658,7 @@ TEST(IonExtractorFailsOn, TooLargeMaxPathLength) {
     ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractorFailsOn, TooLargeMaxNumPaths) {
+TEST(IonExtractorFailsWhen, MaxNumPathsExceedsLimit) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH;
@@ -502,7 +666,7 @@ TEST(IonExtractorFailsOn, TooLargeMaxNumPaths) {
     ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractorFailsOn, TooSmallMaxPathLength) {
+TEST(IonExtractorFailsWhen, MaxPathLengthIsBelowMinimum) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = 0;
@@ -510,7 +674,7 @@ TEST(IonExtractorFailsOn, TooSmallMaxPathLength) {
     ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractorFailsOn, TooSmallMaxNumPaths) {
+TEST(IonExtractorFailsWhen, MaxNumPathsIsBelowMinimum) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_OPTIONS options;
     options.max_path_length = ION_EXTRACTOR_MAX_PATH_LENGTH;
@@ -518,7 +682,7 @@ TEST(IonExtractorFailsOn, TooSmallMaxNumPaths) {
     ION_ASSERT_FAIL(ion_extractor_open(&extractor, &options));
 }
 
-TEST(IonExtractorFailsOn, PathSizeZero) {
+TEST(IonExtractorFailsWhen, PathLengthIsZero) {
     hEXTRACTOR extractor;
     hPATH path;
     ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
@@ -526,7 +690,7 @@ TEST(IonExtractorFailsOn, PathSizeZero) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, PathExceedsDeclaredLength) {
+TEST(IonExtractorFailsWhen, PathExceedsDeclaredLength) {
     hEXTRACTOR extractor;
     hPATH path;
     ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
@@ -536,7 +700,7 @@ TEST(IonExtractorFailsOn, PathExceedsDeclaredLength) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, PathExceedsMaxLength) {
+TEST(IonExtractorFailsWhen, PathExceedsMaxLength) {
     hEXTRACTOR extractor;
     hPATH path;
     ION_EXTRACTOR_OPTIONS options;
@@ -547,21 +711,20 @@ TEST(IonExtractorFailsOn, PathExceedsMaxLength) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, IncompletePath) {
+TEST(IonExtractorFailsWhen, PathIsIncomplete) {
     hEXTRACTOR extractor;
     hPATH path;
     hREADER reader;
-    ION_ASSERT_OK(ion_test_new_text_reader("[1, [1, 2], 3]", &reader));
+    const char *ion_text = "[1, [1, 2], 3]";
     ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
     ION_ASSERT_OK(ion_extractor_path_create(extractor, 3, &testCallbackBasic, NULL, &path));
     ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 1));
     ION_ASSERT_OK(ion_extractor_path_append_ordinal(path, 0));
-    ION_ASSERT_FAIL(ion_extractor_match(extractor, reader));
-    ION_ASSERT_OK(ion_extractor_close(extractor));
-    ION_ASSERT_OK(ion_reader_close(reader));
+
+    ION_EXTRACTOR_TEST_MATCH_EXPECT_FAILURE;
 }
 
-TEST(IonExtractorFailsOn, TooManyRegisteredPaths) {
+TEST(IonExtractorFailsWhen, TooManyPathsAreRegistered) {
     hEXTRACTOR extractor;
     hPATH path;
     ION_EXTRACTOR_OPTIONS options;
@@ -573,7 +736,7 @@ TEST(IonExtractorFailsOn, TooManyRegisteredPaths) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, PathAppendWithoutCreate) {
+TEST(IonExtractorFailsWhen, PathIsAppendedBeforeCreation) {
     hEXTRACTOR extractor;
     ION_EXTRACTOR_PATH_DESCRIPTOR *path = (ION_EXTRACTOR_PATH_DESCRIPTOR *)malloc(sizeof(ION_EXTRACTOR_PATH_DESCRIPTOR));
     ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
@@ -586,7 +749,7 @@ TEST(IonExtractorFailsOn, PathAppendWithoutCreate) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, CreatePathFromIonWithMoreThanOneTopLevelValue) {
+TEST(IonExtractorFailsWhen, PathIsCreatedFromIonWithMoreThanOneTopLevelValue) {
     hEXTRACTOR extractor;
     hPATH path;
     const char *data = "(foo) 123";
@@ -595,7 +758,7 @@ TEST(IonExtractorFailsOn, CreatePathFromIonWithMoreThanOneTopLevelValue) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, CreatePathFromIonWithZeroPathComponents) {
+TEST(IonExtractorFailsWhen, PathIsCreatedFromIonWithZeroPathComponents) {
     hEXTRACTOR extractor;
     hPATH path;
     const char *data = "()";
@@ -604,7 +767,7 @@ TEST(IonExtractorFailsOn, CreatePathFromIonWithZeroPathComponents) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, CreatePathFromIonNotSequence) {
+TEST(IonExtractorFailsWhen, PathIsCreatedFromIonThatIsNotASequence) {
     hEXTRACTOR extractor;
     hPATH path;
     const char *data = "abc";
@@ -613,7 +776,7 @@ TEST(IonExtractorFailsOn, CreatePathFromIonNotSequence) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, CreatePathFromIonPathExceedsMaxLength) {
+TEST(IonExtractorFailsWhen, PathIsCreatedFromIonThatExceedsMaxLength) {
     hEXTRACTOR extractor;
     hPATH path;
     const char *data = "(foo bar)";
@@ -625,7 +788,7 @@ TEST(IonExtractorFailsOn, CreatePathFromIonPathExceedsMaxLength) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, AppendAfterCreatePathFromIon) {
+TEST(IonExtractorFailsWhen, PathIsAppendedAfterCreationFromIon) {
     hEXTRACTOR extractor;
     hPATH path;
     const char *data = "(foo bar)";
@@ -635,7 +798,7 @@ TEST(IonExtractorFailsOn, AppendAfterCreatePathFromIon) {
     ION_ASSERT_OK(ion_extractor_close(extractor));
 }
 
-TEST(IonExtractorFailsOn, ReaderStartingAtDepthOtherThanZero) {
+TEST(IonExtractorFailsWhen, ReaderStartsAtDepthOtherThanZero) {
     hEXTRACTOR extractor;
     hREADER reader;
     hPATH path;
@@ -649,54 +812,15 @@ TEST(IonExtractorFailsOn, ReaderStartingAtDepthOtherThanZero) {
     ASSERT_EQ(tid_STRUCT, type);
     ION_ASSERT_OK(ion_reader_step_in(reader));
     ION_ASSERT_OK(ion_extractor_open(&extractor, NULL));
+
     ION_ASSERT_OK(ion_extractor_path_create_from_ion(extractor, &testCallbackNeverInvoked, NULL, (BYTE *)"(baz)", 5, &path));
-    ION_ASSERT_FAIL(ion_extractor_match(extractor, reader));
-    ION_ASSERT_OK(ion_extractor_close(extractor));
-    ION_ASSERT_OK(ion_reader_close(reader));
+
+    ION_EXTRACTOR_TEST_MATCH_READER_EXPECT_FAILURE(reader);
 }
 
-void assertMatchesRelativePath(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
-                               ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
-    ION_TYPE type;
-    int value;
-    ASSERT_TRUE(original_path == matched_path);
-    ION_ASSERT_OK(ion_reader_get_type(reader, &type));
-    ASSERT_EQ(tid_INT, type);
-    ION_ASSERT_OK(ion_reader_read_int(reader, &value));
-    ASSERT_TRUE((value == 123) || (value == 456));
-}
-
-TEST(IonExtractor, MatchesRelativePath) {
-    ION_EXTRACTOR_OPTIONS options;
-    options.max_path_length = ION_EXTRACTOR_TEST_PATH_LENGTH;
-    options.max_num_paths = ION_EXTRACTOR_TEST_MAX_PATHS;
-    options.match_relative_paths = true;
-    ION_EXTRACTOR_TEST_INIT_OPTIONS(options);
-    ION_TYPE type;
-    // Step in the reader to point to the first 'bar' at depth 2. The extractor will process all siblings of depth 2,
-    // but will not step out past depth 2.
-    const char *ion_text = "{foo:{bar:{baz:123}, bar:{baz:456}}, foo{bar:{baz:789}}}";
-    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader));
-    ION_ASSERT_OK(ion_reader_next(reader, &type));
-    ASSERT_EQ(tid_STRUCT, type);
-    ION_ASSERT_OK(ion_reader_step_in(reader));
-    ION_ASSERT_OK(ion_reader_next(reader, &type));
-    ASSERT_EQ(tid_STRUCT, type);
-    ION_ASSERT_OK(ion_reader_step_in(reader));
-    ION_ASSERT_OK(ion_extractor_open(&extractor, &options));
-
-    assertion = &assertMatchesRelativePath;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(baz)"); // Matches 123 and 456
-    assertion = &assertDoesNotMatchPath;
-    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo bar baz)"); // Never matches because the extractor is scoped at depth 2.
-    ION_ASSERT_OK(ion_extractor_match(extractor, reader));
-    ION_ASSERT_OK(ion_extractor_close(extractor));
-    ION_ASSERT_OK(ion_reader_close(reader));
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 2);
-    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
-}
-
-void assertStructAndStepInButNotOut(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path, ION_EXTRACTOR_PATH_DESCRIPTOR *original_path, ION_EXTRACTOR_CONTROL *control) {
+void assertMatchesStructWithListNamedBarNoStepOut(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTOR *matched_path,
+                                                  ION_EXTRACTOR_PATH_DESCRIPTOR *original_path,
+                                                  ION_EXTRACTOR_CONTROL *control) {
     ION_TYPE type;
     ION_STRING field_name;
     ASSERT_TRUE(matched_path == original_path);
@@ -710,16 +834,52 @@ void assertStructAndStepInButNotOut(hREADER reader, ION_EXTRACTOR_PATH_DESCRIPTO
     // No matching call to ion_reader_step_out. This will cause the extractor to raise an error.
 }
 
-TEST(IonExtractorFailsOn, ReturningFromCallbackAtDifferentDepth) {
+TEST(IonExtractorFailsWhen, ReaderReturnsFromCallbackAtDifferentDepth) {
     ION_EXTRACTOR_TEST_INIT;
     const char *ion_text = "{abc: def, foo: {bar:[1, 2, 3]}}";
 
-    assertion = &assertStructAndStepInButNotOut;
+    assertion = &assertMatchesStructWithListNamedBarNoStepOut;
     ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(foo)");
-    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader));
-    ION_ASSERT_FAIL(ion_extractor_match(extractor, reader));
-    ION_ASSERT_OK(ion_extractor_close(extractor));
-    ION_ASSERT_OK(ion_reader_close(reader));
 
+    ION_EXTRACTOR_TEST_MATCH_EXPECT_FAILURE;
     ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorFailsWhen, ControlStepsOutBeyondReaderDepth) {
+    ION_EXTRACTOR_TEST_INIT;
+    const char *ion_text = "{abc: def}";
+
+    assertion = &assertMatchesTextDEFThenStepOut2;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
+
+    ION_EXTRACTOR_TEST_MATCH_EXPECT_FAILURE;
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+}
+
+TEST(IonExtractorFailsWhen, ControlStepsOutBeyondRelativePathDepth) {
+    ION_EXTRACTOR_OPTIONS options;
+    options.max_path_length = ION_EXTRACTOR_TEST_PATH_LENGTH;
+    options.max_num_paths = ION_EXTRACTOR_TEST_MAX_PATHS;
+    options.match_relative_paths = true;
+    ION_EXTRACTOR_TEST_INIT_OPTIONS(options);
+    ION_TYPE type;
+    const char *ion_text = "{foo:{baz:{abc:def}, zar:{ghi:jkl}}, bar:123}";
+    ION_ASSERT_OK(ion_test_new_text_reader(ion_text, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // {
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type)); // foo
+    ASSERT_EQ(tid_STRUCT, type);
+    ION_ASSERT_OK(ion_reader_step_in(reader)); // at depth 2
+
+    assertion = &assertMatchesTextDEFThenStepOut2;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(abc)");
+    assertion = &assertPathNeverMatches;
+    ION_EXTRACTOR_TEST_PATH_FROM_TEXT("(ghi)"); // Would match, except this is skipped by control.
+
+    // This scopes the extractor at depth 2. The callback will tell the extractor to step out 2 from depth 3, which
+    // would normally be legal, but will fail in this case because it would exit the extractor's scope.
+    ION_EXTRACTOR_TEST_MATCH_READER_EXPECT_FAILURE(reader);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(0, 1);
+    ION_EXTRACTOR_TEST_ASSERT_MATCHED(1, 0);
 }
