@@ -12,6 +12,8 @@
  * language governing permissions and limitations under the License.
  */
 
+#include <decNumber.h>
+#include <decContext.h>
 #include "ion_internal.h"
 #define IONCLOSEpREADER(x)  {   if (x != NULL)                                  \
                                 {                                               \
@@ -471,6 +473,7 @@ iERR _ion_reader_initialize(ION_READER *preader, BYTE *version_buffer, SIZE vers
 
     // initialize decimal context
     decContextDefault(&preader->_deccontext, DEC_INIT_DECQUAD);
+    preader->_deccontext.digits = 100; // TODO allow user to provide a dec context?
 
     // we start our symbol table out with the system symbol table
     preader->_current_symtab = system;
@@ -1402,6 +1405,42 @@ iERR _ion_reader_read_decimal_helper(ION_READER *preader, decQuad *p_value)
     case ion_type_unknown_reader:
     default:
         FAILWITH(IERR_INVALID_STATE);
+    }
+
+    iRETURN;
+}
+
+iERR ion_reader_read_decimal_big(hREADER hreader, decNumber *p_value)
+{
+    iENTER;
+    ION_READER *preader;
+
+    if (!hreader) FAILWITH(IERR_INVALID_ARG);
+    preader = HANDLE_TO_PTR(hreader, ION_READER);
+    if (!p_value) FAILWITH(IERR_INVALID_ARG);
+
+    IONCHECK(_ion_reader_read_decimal_big_helper(preader, p_value));
+
+    iRETURN;
+}
+
+iERR _ion_reader_read_decimal_big_helper(ION_READER *preader, decNumber *p_value)
+{
+    iENTER;
+
+    ASSERT(preader);
+    ASSERT(p_value);
+
+    switch(preader->type) {
+        case ion_type_text_reader:
+            IONCHECK(_ion_reader_text_read_decimal_big(preader, p_value));
+            break;
+        case ion_type_binary_reader:
+            IONCHECK(_ion_reader_binary_read_decimal_big(preader, p_value));
+            break;
+        case ion_type_unknown_reader:
+        default:
+            FAILWITH(IERR_INVALID_STATE);
     }
 
     iRETURN;

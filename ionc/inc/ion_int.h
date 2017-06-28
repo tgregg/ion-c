@@ -130,6 +130,7 @@ ION_INT_GLOBAL ION_INT         g_Int_Null
 ION_INT_GLOBAL BOOL            g_ion_int_globals_initialized; // NOTE: this is initialized to 0 according to C standard.
 ION_INT_GLOBAL decContext      g_Context;
 ION_INT_GLOBAL decQuad         g_digit_base;
+ION_INT_GLOBAL decNumber*      g_digit_base_big;
 ION_INT_GLOBAL decQuad         g_decQuad_Mask;
 ION_INT_GLOBAL decQuad         g_decQuad_Shift;
 
@@ -157,6 +158,7 @@ ION_API_EXPORT iERR ion_int_from_bytes      (ION_INT *iint, BYTE *buf, SIZE limi
 ION_API_EXPORT iERR ion_int_from_abs_bytes  (ION_INT *iint, BYTE *buf, SIZE limit, BOOL is_negative);
 ION_API_EXPORT iERR ion_int_from_long       (ION_INT *iint, int64_t value);
 ION_API_EXPORT iERR ion_int_from_decimal    (ION_INT *iint, const decQuad *p_value);
+ION_API_EXPORT iERR ion_int_from_decimal_big(ION_INT *iint, const decNumber *p_value);
 
 ION_API_EXPORT iERR ion_int_char_length     (ION_INT *iint, SIZE *p_len);
 ION_API_EXPORT iERR ion_int_to_char         (ION_INT *iint, BYTE *p_str, SIZE len, SIZE *p_written);
@@ -169,6 +171,7 @@ ION_API_EXPORT iERR ion_int_to_abs_bytes    (ION_INT *iint, SIZE starting_int_by
 ION_API_EXPORT iERR ion_int_to_int64        (ION_INT *iint, int64_t *p_int64);
 ION_API_EXPORT iERR ion_int_to_int32        (ION_INT *iint, int32_t *p_int32);
 ION_API_EXPORT iERR ion_int_to_decimal      (ION_INT *iint, decQuad *p_quad);
+ION_API_EXPORT iERR ion_int_to_decimal_big  (ION_INT *iint, decNumber *p_value);
 
 //////////////////////////////////////////////////////////////
 // internal functions

@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <decNumber.h>
 
 #if defined(_MSC_VER)
 #define FLOAT_CLASS(x) _fpclass(x)
@@ -547,6 +548,49 @@ iERR _ion_writer_text_write_decimal(ION_WRITER *pwriter, decQuad *value)
     }
     else {
         start = decQuadToString(value, image);
+        exp = strchr(image, 'E');
+        dec = strchr(image, '.');
+        if (exp) *exp = 'd';
+        if (!dec && !exp) {
+            strcat(image, "d+0");
+        }
+    }
+
+    IONCHECK(_ion_writer_text_append_ascii_cstr(pwriter->output, start));
+    IONCHECK(_ion_writer_text_close_value(pwriter));
+
+    iRETURN;
+}
+
+iERR _ion_writer_text_write_decimal_big(ION_WRITER *pwriter, decNumber *value)
+{
+    iENTER;
+    char *image, *dec, *exp, *start;
+    BOOL is_negative;
+
+    if (!pwriter) FAILWITH(IERR_BAD_HANDLE);
+
+    IONCHECK(_ion_writer_text_start_value(pwriter));
+
+    // if dec the pointer is null, that's a null value lou
+    if (value == NULL) {
+        IONCHECK(_ion_writer_text_write_typed_null(pwriter, tid_DECIMAL));
+        SUCCEED();
+    }
+
+    is_negative = decNumberIsNegative(value);
+    if (decNumberIsInfinite(value)) {
+        start = is_negative ? "-inf" : "+inf";
+    }
+    else if (decNumberIsNaN(value)) {
+        start = "nan";
+    }
+    else if (decNumberIsZero(value) && !is_negative && value->digits != 1) {
+        start = "0d0";
+    }
+    else {
+        image = ion_alloc_with_owner(pwriter, value->digits + 14); // +14 is specified by decNumberToString.
+        start = decNumberToString(value, image);
         exp = strchr(image, 'E');
         dec = strchr(image, '.');
         if (exp) *exp = 'd';

@@ -1562,14 +1562,14 @@ iERR _ion_reader_text_read_double(ION_READER *preader, double *p_value)
 }
 
 
-iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_value)
+iERR _ion_reader_text_read_decimal_helper(ION_READER *preader, decQuad *p_quad, decNumber *p_number)
 {
     iENTER;
     ION_TEXT_READER *text = &preader->typed_reader.text;
     char            *cp, c_save = 0;
 
     ASSERT(preader);
-    ASSERT(p_value);
+    ASSERT(p_quad || p_number);
 
     if (text->_state == IPS_ERROR 
      || text->_state == IPS_NONE 
@@ -1598,7 +1598,12 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_value)
         *cp = 'e';
     }
 
-    decQuadFromString(p_value, text->_scanner._value_image.value, &preader->_deccontext);
+    if (p_number) {
+        decNumberFromString(p_number, text->_scanner._value_image.value, &preader->_deccontext);
+    }
+    else {
+        decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
+    }
 
     // restore the string is we munged it, just in case someone else wants to use if later
     if (*cp) {
@@ -1606,6 +1611,20 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_value)
     }
     SUCCEED();
 
+    iRETURN;
+}
+
+iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_value) {
+    iENTER;
+    ASSERT(p_value);
+    IONCHECK(_ion_reader_text_read_decimal_helper(preader, p_value, NULL));
+    iRETURN;
+}
+
+iERR _ion_reader_text_read_decimal_big(ION_READER *preader, decNumber *p_value) {
+    iENTER;
+    assert(p_value);
+    IONCHECK(_ion_reader_text_read_decimal_helper(preader, NULL, p_value));
     iRETURN;
 }
 

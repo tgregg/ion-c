@@ -17,6 +17,7 @@
 // will contain the text or binary content, returns handle to a writer.
 //
 
+#include <decContext.h>
 #include "ion_internal.h"
 
 #define IONCLOSEpWRITER(x)   { if (x != NULL)  { UPDATEERROR(_ion_writer_close_helper(x)); x = NULL;}}
@@ -127,6 +128,7 @@ iERR _ion_writer_open_helper(ION_WRITER **p_pwriter, ION_STREAM *stream, ION_WRI
 
     // initialize decimal context
     decContextDefault(&pwriter->deccontext, DEC_INIT_DECQUAD);
+    pwriter->deccontext.digits = 100; // TODO allow the user to specify a dec context?
 
     // our default is unknown, so if the option says "binary" we need to 
     // change the underlying writer's obj type we'll use the presence of 
@@ -1043,6 +1045,39 @@ iERR _ion_writer_write_decimal_helper(ION_WRITER *pwriter, decQuad *value)
         IONCHECK(_ion_writer_binary_write_decimal(pwriter, value));
         break;
     default:
+        FAILWITH(IERR_INVALID_ARG);
+    }
+
+    iRETURN;
+}
+
+iERR ion_writer_write_decimal_big(hWRITER hwriter, decNumber *value)
+{
+    iENTER;
+    ION_WRITER *pwriter;
+
+    if (!hwriter)   FAILWITH(IERR_BAD_HANDLE);
+    pwriter = HANDLE_TO_PTR(hwriter, ION_WRITER);
+
+    IONCHECK(_ion_writer_write_decimal_big_helper(pwriter, value));
+
+    iRETURN;
+}
+
+iERR _ion_writer_write_decimal_big_helper(ION_WRITER *pwriter, decNumber *value)
+{
+    iENTER;
+
+    ASSERT(pwriter);
+
+    switch (pwriter->type) {
+        case ion_type_text_writer:
+        IONCHECK(_ion_writer_text_write_decimal_big(pwriter, value));
+            break;
+        case ion_type_binary_writer:
+        IONCHECK(_ion_writer_binary_write_decimal_big(pwriter, value));
+            break;
+        default:
         FAILWITH(IERR_INVALID_ARG);
     }
 

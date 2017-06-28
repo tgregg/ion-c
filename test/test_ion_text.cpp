@@ -12,6 +12,7 @@
  * language governing permissions and limitations under the License.
  */
 
+#include <decNumber.h>
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"
@@ -555,4 +556,57 @@ TEST(IonTextSymbol, ReaderReadsLocalSymbolsFromIdentifiers) {
     assertStringsEqual("baz", (char *)symbol.value, symbol.length);
 
     ION_ASSERT_OK(ion_reader_close(reader));
+}
+/* SHOULD fail; decQuad can't handle that much precision.
+TEST(IonTextDecimal, ReaderPreservesFullFidelity) {
+    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
+    hREADER reader;
+    ION_TYPE type;
+    decQuad decimal;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_decimal(reader, &decimal));
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
+    ION_ASSERT_OK(ion_writer_write_decimal(writer, &decimal));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
+                                                << std::string((char *)result, result_len);
+    ASSERT_STREQ(text_decimal, (char *)result);
+}
+*/
+TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
+    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
+    hREADER reader;
+    ION_TYPE type;
+    char decimal_buf[512];
+    decNumber *decimal = (decNumber *)decimal_buf;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_decimal_big(reader, decimal));
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
+    ION_ASSERT_OK(ion_writer_write_decimal_big(writer, decimal));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
+                                                << std::string((char *)result, result_len);
+    ASSERT_STREQ(text_decimal, (char *)result);
 }

@@ -13,6 +13,7 @@
  */
 
 #include <limits.h>
+#include <decNumber.h>
 #include "ion_internal.h"
 
 // These field formats are always used in some context that clearly indicates the number of octets in the field.
@@ -389,7 +390,7 @@ iERR ion_binary_read_double(ION_STREAM *pstream, int32_t len, double *p_value)
     iRETURN;
 }
 
-iERR _ion_binary_read_decimal_big_helper(ION_STREAM *pstream, int32_t len, decContext *context, decQuad *p_value) {
+iERR _ion_binary_read_decimal_quad_helper(ION_STREAM *pstream, int32_t len, decContext *context, decQuad *p_value) {
     iENTER;
     ION_INT mantissa;
 
@@ -445,10 +446,114 @@ iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *conte
             ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_value);
         }
         else {
-            IONCHECK(_ion_binary_read_decimal_big_helper(pstream, (int32_t)value_len, context, p_value));
+            IONCHECK(_ion_binary_read_decimal_quad_helper(pstream, (int32_t)value_len, context, p_value));
             decQuadSetExponent(p_value, context, exponent);
         }
     }
+
+    iRETURN;
+}
+
+iERR _ion_binary_read_decimal_big_helper(ION_STREAM *pstream, int32_t len, decContext *context, decNumber *p_value) {
+    iENTER;
+    ION_INT mantissa;
+
+    IONCHECK(ion_int_init(&mantissa, NULL));
+    IONCHECK(ion_binary_read_ion_int_signed(pstream, len, &mantissa));
+    IONCHECK(ion_int_to_decimal_big(&mantissa, p_value));
+    iRETURN;
+}
+
+iERR _ion_binary_read_decimal_big_from_uint64(uint64_t mantissa, BOOL isNegative, decContext *context, decNumber *p_value) {
+    iENTER;
+    // NOTE: a decNumber is about 11 bytes and the digit base fits in 8 bytes (32 bits in 10 decimal digits, with
+    // DECDPUN=3 digits per decimal unit = 4 required decimal units, with sizeof(decNumberUnit)=2), so the decNumber
+    // representing II_BASE needs about 19 bytes total. Some extra space is allocated here just in case this changes
+    // slightly.
+    int nine_digits, multiplier_exponent;
+    char nine_dec_digits_buf[32], multiplier_buf[32];
+    decNumber *nine_dec_digits = (decNumber *)nine_dec_digits_buf;
+    decNumber *multiplier = (decNumber *)multiplier_buf;
+
+    decNumberFromInt32(multiplier, 1);
+    multiplier_exponent = 0;
+    while (mantissa > 0) {
+        // crack off the lower 9 digits (and removed them from the original)
+        nine_digits = (int)(mantissa % BILLION);
+        mantissa /= BILLION;
+
+        // turn the 9 digits into a quad (so we can do the right thing later)
+        decNumberFromInt32(nine_dec_digits, nine_digits);
+
+        // set our multiplier to be the right size, starting with 1e0
+        multiplier->exponent = multiplier_exponent;
+
+        // decDoubleFMA(r, x, y, z, set)
+        // Calculates the fused multiply-add x * y + z and places the result in r
+        decNumberFMA(p_value, multiplier, nine_dec_digits, p_value, context);
+
+        // so we have the right multiplier for next time
+        multiplier_exponent += 9;
+    }
+
+    if (isNegative) {
+        decNumberMinus(p_value, p_value, context);
+    }
+    iRETURN;
+}
+
+iERR ion_binary_read_decimal_big(ION_STREAM *pstream, int32_t len, decContext *context, decNumber *p_value)
+{
+    iENTER;
+    int64_t start_exp, finish_exp, value_len;
+    uint64_t mantissa;
+    int32_t exponent;
+    BOOL    isNegative;
+
+    ASSERT(pstream != NULL);
+    ASSERT(len >= 0);
+    ASSERT(context != NULL);
+    ASSERT(p_value != NULL);
+
+    if (len == 0) {
+        decNumberZero(p_value);
+        SUCCEED();
+    }
+
+    // we'll watch the start and end to know how many of the bytes
+    // of the value were used by the exponent, the rest (if any)
+    // will make up the mantissa
+    start_exp = ION_INPUT_STREAM_POSITION(pstream);
+    IONCHECK(ion_binary_read_var_int_32(pstream, &exponent));
+    finish_exp = ION_INPUT_STREAM_POSITION(pstream);
+    value_len = len - (finish_exp - start_exp);
+
+    if (value_len < 0) {
+        FAILWITHMSG(IERR_INVALID_BINARY, "Invalid binary size for decimal");
+    }
+
+    isNegative = FALSE;
+    if (value_len == 0) {
+        //mantissa = 0;
+        //ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_value);
+        decNumberZero(p_value);
+    }
+    else {
+        if (value_len <= sizeof(uint64_t)) {
+            // NOTE: the branch condition is conservative. Because the mantissa subfield is signed, a mantissa with an
+            // 8-byte magnitude can be 9 bytes when encoded if the most significant bit in its most significant byte
+            // is set. In that case, a ninth byte is needed to represent the sign, even though it adds nothing to the
+            // magnitude. Although this exact case could be checked, it is probably not worth the extra complexity given
+            // that most decimals likely do not fall in that range.
+            IONCHECK(ion_binary_read_int_64_and_sign(pstream, (int32_t)value_len, &mantissa, &isNegative));
+            //ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_value);
+            IONCHECK(_ion_binary_read_decimal_big_from_uint64(mantissa, isNegative, context, p_value));
+        }
+        else {
+            IONCHECK(_ion_binary_read_decimal_big_helper(pstream, (int32_t)value_len, context, p_value));
+        }
+    }
+    p_value->exponent = exponent;
 
     iRETURN;
 }

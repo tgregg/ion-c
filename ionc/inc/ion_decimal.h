@@ -33,6 +33,7 @@ ION_API_EXPORT iERR ion_decimal_get_double_value   (decQuad *dec, double *p_valu
  * equivalent for the normalized values (even for zero).
  */
 ION_API_EXPORT iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
+ION_API_EXPORT iERR ion_decimal_big_equals(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal);
 
 #ifdef __cplusplus
 }

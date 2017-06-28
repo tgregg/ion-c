@@ -12,6 +12,7 @@
  * language governing permissions and limitations under the License.
  */
 
+#include <decNumber.h>
 #include "ion.h"
 #include "ion_helpers.h"
 
@@ -45,6 +46,34 @@ iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *c
     if (memcmp(left_coefficient, right_coefficient, DECQUAD_Pmax)) {
         goto not_equal;
     }
+    *is_equal = TRUE;
+    SUCCEED();
+not_equal:
+    *is_equal = FALSE;
+    iRETURN;
+}
+
+iERR ion_decimal_big_equals(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal) {
+    iENTER;
+    // Note: all decNumbers are canonical.
+    if (!left || !right || !context || !is_equal) FAILWITH(IERR_INVALID_ARG);
+
+    if (left->exponent != right->exponent) {
+        goto not_equal;
+    }
+
+    if (left->digits != right->digits) {
+        goto not_equal;
+    }
+
+    if (left->bits != right->bits) {
+        goto not_equal;
+    }
+
+    if (memcmp(left->lsu, right->lsu, (size_t)((right->digits / DECDPUN)) + ((right->digits % DECDPUN) ? 1 : 0))) {
+        goto not_equal;
+    }
+
     *is_equal = TRUE;
     SUCCEED();
 not_equal:
