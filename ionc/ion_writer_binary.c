@@ -640,27 +640,29 @@ iERR _ion_writer_binary_write_decimal_small_helper(ION_STREAM *pstream, uint64_t
     iRETURN;
 }
 
-iERR _ion_writer_binary_decimal_quad_len_and_mantissa(decQuad *value, decQuad *mantissa, int32_t exponent,
-                                                      ION_INT *p_int_mantissa, SIZE *p_mantissa_len, SIZE *p_len) {
+iERR _ion_writer_binary_decimal_quad_len_and_mantissa(decQuad *value, decQuad *mantissa, decContext *context,
+                                                      int32_t exponent, ION_INT *p_int_mantissa, SIZE *p_mantissa_len,
+                                                      SIZE *p_len) {
     iENTER;
 
     ASSERT(!decQuadIsZero(value));
     ASSERT(decQuadIsInteger(mantissa));
 
     IONCHECK(ion_int_init(p_int_mantissa, NULL));
-    IONCHECK(ion_int_from_decimal(p_int_mantissa, mantissa));
+    IONCHECK(ion_int_from_decimal(p_int_mantissa, mantissa, context));
     *p_len += ion_binary_len_var_int_64(exponent);
     *p_mantissa_len = _ion_int_abs_bytes_signed_length_helper(p_int_mantissa);
     *p_len += *p_mantissa_len;
     iRETURN;
 }
 
-iERR _ion_writer_binary_decimal_big_len_and_mantissa(decNumber *value, ION_INT *p_int_mantissa, SIZE *p_mantissa_len, SIZE *p_len) {
+iERR _ion_writer_binary_decimal_big_len_and_mantissa(decNumber *value, decContext *context, ION_INT *p_int_mantissa,
+                                                     SIZE *p_mantissa_len, SIZE *p_len) {
     iENTER;
     ASSERT(!decNumberIsZero(value));
 
     IONCHECK(ion_int_init(p_int_mantissa, NULL));
-    IONCHECK(ion_int_from_decimal_big(p_int_mantissa, value));
+    IONCHECK(ion_int_from_decimal_big(p_int_mantissa, value, context));
     *p_len += ion_binary_len_var_int_64(value->exponent);
     *p_mantissa_len = _ion_int_abs_bytes_signed_length_helper(p_int_mantissa);
     *p_len += *p_mantissa_len;
@@ -724,7 +726,7 @@ iERR _ion_writer_binary_write_decimal_quad(ION_WRITER *pwriter, decQuad *value, 
     SIZE int_mantissa_len;
     int len = 0, patch_len;
 
-    IONCHECK(_ion_writer_binary_decimal_quad_len_and_mantissa(value, dec_mantissa, exponent,
+    IONCHECK(_ion_writer_binary_decimal_quad_len_and_mantissa(value, dec_mantissa, &pwriter->deccontext, exponent,
                                                               &int_mantissa, &int_mantissa_len, &len));
     IONCHECK(_ion_writer_binary_write_header(pwriter, TID_DECIMAL, len, &patch_len));
     IONCHECK(_ion_writer_binary_write_decimal_helper(pwriter->_typed_writer.binary._value_stream, &int_mantissa,
@@ -756,7 +758,8 @@ iERR _ion_writer_binary_write_decimal_big_helper(ION_WRITER *pwriter, decNumber 
     ION_INT int_mantissa;
     SIZE int_mantissa_len;
     int len = 0, patch_len;
-    IONCHECK(_ion_writer_binary_decimal_big_len_and_mantissa(value, &int_mantissa, &int_mantissa_len, &len));
+    IONCHECK(_ion_writer_binary_decimal_big_len_and_mantissa(value, &pwriter->deccontext, &int_mantissa,
+                                                             &int_mantissa_len, &len));
     IONCHECK(_ion_writer_binary_write_header(pwriter, TID_DECIMAL, len, &patch_len));
     IONCHECK(_ion_writer_binary_write_decimal_helper(pwriter->_typed_writer.binary._value_stream, &int_mantissa,
                                                      int_mantissa_len, value->exponent));
@@ -934,8 +937,8 @@ iERR _ion_writer_binary_write_timestamp_fraction_big(ION_WRITER *pwriter, ION_TI
     int len, patch_len;
 
     len = _ion_writer_binary_timestamp_len_without_fraction(value);
-    IONCHECK(_ion_writer_binary_decimal_quad_len_and_mantissa(&value->fraction, dec_mantissa, exponent,
-                                                              &int_mantissa, &int_mantissa_len, &len));
+    IONCHECK(_ion_writer_binary_decimal_quad_len_and_mantissa(&value->fraction, dec_mantissa, &pwriter->deccontext,
+                                                              exponent, &int_mantissa, &int_mantissa_len, &len));
 
     IONCHECK(_ion_writer_binary_write_header(pwriter, TID_TIMESTAMP, len, &patch_len));
     IONCHECK(_ion_writer_binary_write_timestamp_without_fraction_helper(pwriter, value));

@@ -144,7 +144,7 @@
             break; \
         case ASSERTION_TYPE_SET_FLAG: \
             BOOL _decimal_equals; \
-            EXPECT_EQ(IERR_OK, ion_decimal_equals(x, y, &g_Context, &_decimal_equals)); \
+            EXPECT_EQ(IERR_OK, ion_decimal_equals(x, y, &g_TestDecimalContext, &_decimal_equals)); \
             if (!_decimal_equals) return FALSE; \
             break; \
         default: \
@@ -160,7 +160,7 @@
             break; \
         case ASSERTION_TYPE_SET_FLAG: \
             BOOL _timestamps_equal; \
-            EXPECT_EQ(IERR_OK, g_TimestampEquals(x, y, &_timestamps_equal, &g_Context)); \
+            EXPECT_EQ(IERR_OK, g_TimestampEquals(x, y, &_timestamps_equal, &g_TestDecimalContext)); \
             if (!_timestamps_equal) return FALSE; \
             break; \
         default: \
@@ -201,6 +201,13 @@ extern TIMESTAMP_COMPARISON_FN g_TimestampEquals;
  * Global variable that holds the name of the current test.
  */
 extern std::string g_CurrentTest;
+
+/**
+ * Global variable that holds the decimal context to be used throughout tests. Initialized
+ * to contain arbitrarily high limits, which may be raised if necessary, to avoid loss
+ * of precision.
+ */
+extern decContext g_TestDecimalContext;
 
 /**
  * Allocates and returns a new char * representing the given ION_INT.

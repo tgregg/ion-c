@@ -396,7 +396,7 @@ iERR _ion_binary_read_decimal_quad_helper(ION_STREAM *pstream, int32_t len, decC
 
     IONCHECK(ion_int_init(&mantissa, NULL));
     IONCHECK(ion_binary_read_ion_int_signed(pstream, len, &mantissa));
-    IONCHECK(ion_int_to_decimal(&mantissa, p_value));
+    IONCHECK(ion_int_to_decimal(&mantissa, p_value, context));
     iRETURN;
 }
 
@@ -460,7 +460,7 @@ iERR _ion_binary_read_decimal_big_helper(ION_STREAM *pstream, int32_t len, decCo
 
     IONCHECK(ion_int_init(&mantissa, NULL));
     IONCHECK(ion_binary_read_ion_int_signed(pstream, len, &mantissa));
-    IONCHECK(ion_int_to_decimal_big(&mantissa, p_value));
+    IONCHECK(ion_int_to_decimal_big(&mantissa, p_value, context));
     iRETURN;
 }
 

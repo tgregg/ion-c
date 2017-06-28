@@ -127,8 +127,12 @@ iERR _ion_writer_open_helper(ION_WRITER **p_pwriter, ION_STREAM *stream, ION_WRI
     _ion_writer_initialize_option_defaults(&(pwriter->options));
 
     // initialize decimal context
-    decContextDefault(&pwriter->deccontext, DEC_INIT_DECQUAD);
-    pwriter->deccontext.digits = 100; // TODO allow the user to specify a dec context?
+    if (pwriter->options.decimal_context == NULL) {
+        decContextDefault(&pwriter->deccontext, DEC_INIT_DECQUAD);
+    }
+    else {
+        memcpy(&pwriter->deccontext, pwriter->options.decimal_context, sizeof(decContext));
+    }
 
     // our default is unknown, so if the option says "binary" we need to 
     // change the underlying writer's obj type we'll use the presence of 

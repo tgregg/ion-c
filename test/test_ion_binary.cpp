@@ -373,11 +373,11 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_writer_write_decimal_big(writer, decimal_before));
     ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
 
-    ION_ASSERT_OK(ion_reader_open_buffer(&reader, result, (SIZE)result_len, NULL));
+    ION_ASSERT_OK(ion_test_new_reader(result, (SIZE)result_len, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_decimal_big(reader, decimal_after));
-    ion_decimal_big_equals(decimal_before, decimal_after, &((ION_READER *)reader)->_deccontext, &equals);
+    ION_ASSERT_OK(ion_decimal_big_equals(decimal_before, decimal_after, &((ION_READER *)reader)->_deccontext, &equals));
     ION_ASSERT_OK(ion_reader_close(reader));
 
     ASSERT_TRUE(equals);

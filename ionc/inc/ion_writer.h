@@ -90,6 +90,14 @@ typedef struct _ion_writer_options
      */
     ION_SYMBOL_TABLE *encoding_psymbol_table;
 
+    /** Handle to the decNumber context for the writer to use. This allows configuration of the maximum number of
+     * decimal digits, decimal exponent range, etc. See decContextDefault in decContext.h for simple initialization.
+     *
+     * If NULL, the writer will initialize its decimal context by calling decContextDefault with the DEC_INIT_DECQUAD
+     * option, which results in a maximum of 34 decimal digits and an exponent range of [-6143, 6144].
+     */
+    decContext *decimal_context;
+
 } ION_WRITER_OPTIONS;
 
 

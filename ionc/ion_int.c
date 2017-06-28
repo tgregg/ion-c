@@ -627,7 +627,7 @@ iERR ion_int_from_long(ION_INT *iint, int64_t value)
 }
   
   
-iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value)
+iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value, decContext *context)
 {
     iENTER;
     BOOL     is_neg;
@@ -665,12 +665,10 @@ iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value)
         is_zero = decQuadIsZero(&temp1);
         if (is_zero) break; // so I can see this in a debugger
 
-//        decQuadAnd(&temp2, &temp1, &g_decQuad_Mask, &g_Context);
-        decQuadRemainder(&temp2, &temp1, &g_digit_base, &g_Context);
-        digit = decQuadToUInt32(&temp2, &g_Context, DEC_ROUND_DOWN);
+        decQuadRemainder(&temp2, &temp1, &g_digit_base, context);
+        digit = decQuadToUInt32(&temp2, context, DEC_ROUND_DOWN);
         iint->_digits[digit_idx] = digit;
-//        decQuadShift(&temp1, &temp1, &g_decQuad_Shift, &g_Context);
-        decQuadDivideInteger(&temp1, &temp1, &g_digit_base, &g_Context);
+        decQuadDivideInteger(&temp1, &temp1, &g_digit_base, context);
     }
 
     // we don't have to zero the digits because we did during allocation
@@ -680,14 +678,12 @@ iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value)
     iRETURN;
 }
 
-iERR ion_int_from_decimal_big(ION_INT *iint, const decNumber *p_value)
+iERR ion_int_from_decimal_big(ION_INT *iint, const decNumber *p_value, decContext *context)
 {
     iENTER;
     BOOL     is_neg;
     SIZE     bits, ii_length, dec_units;
     II_DIGIT dec_unit_shift = 1;
-    //decQuad  temp1, temp2;
-    //int32_t  is_zero;
     int i;
 
     _ion_int_init_globals();
@@ -696,10 +692,6 @@ iERR ion_int_from_decimal_big(ION_INT *iint, const decNumber *p_value)
     if (!decNumberIsFinite(p_value)) {
         FAILWITH(IERR_INVALID_ARG);
     }
-    // Just ignore the exponent
-    //if (p_value->exponent != 0) {
-    //    FAILWITH(IERR_INVALID_ARG);
-    //}
 
     // special case since zero is so common (and quick to test and set)
     if (decNumberIsZero(p_value)) {
@@ -955,7 +947,7 @@ iERR ion_int_to_int32(ION_INT *iint, int32_t *p_int32)
 }
 
 
-iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad)
+iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad, decContext *context)
 {
     iENTER;
     II_DIGIT *digits, *end, digit;
@@ -972,22 +964,21 @@ iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad)
     while (digits < end) {
         digit = *digits++;
         decQuadFromInt32(&quad_digit, (int32_t)digit);
-        decQuadFMA(p_quad, p_quad, &g_digit_base, &quad_digit, &g_Context);
+        decQuadFMA(p_quad, p_quad, &g_digit_base, &quad_digit, context);
     }
 
     if (iint->_signum == -1) {
-        decQuadMinus(p_quad, p_quad, &g_Context);
+        decQuadMinus(p_quad, p_quad, context);
     }
     SUCCEED();
 
     iRETURN;
 }
 
-iERR ion_int_to_decimal_big(ION_INT *iint, decNumber *p_value)
+iERR ion_int_to_decimal_big(ION_INT *iint, decNumber *p_value, decContext *context)
 {
     iENTER;
     II_DIGIT *digits, *end, digit;
-    //decQuad   quad_digit;
     // NOTE: a decNumber is about 11 bytes and the digit base fits in 8 bytes (32 bits in 10 decimal digits, with
     // DECDPUN=3 digits per decimal unit = 4 required decimal units, with sizeof(decNumberUnit)=2), so the decNumber
     // representing II_BASE needs about 19 bytes total. Some extra space is allocated here just in case this changes
@@ -1006,13 +997,12 @@ iERR ion_int_to_decimal_big(ION_INT *iint, decNumber *p_value)
     while (digits < end) {
         digit = *digits++;
         decNumberFromInt32(dec_digit, (int32_t)digit);
-        decNumberFMA(p_value, p_value, g_digit_base_big, dec_digit, &g_Context);
+        decNumberFMA(p_value, p_value, g_digit_base_big, dec_digit, context);
     }
 
     if (iint->_signum == -1) {
-        decNumberMinus(p_value, p_value, &g_Context);
+        decNumberMinus(p_value, p_value, context);
     }
-    SUCCEED();
 
     iRETURN;
 }
@@ -1035,36 +1025,16 @@ static char gDigitBaseBigBuffer[32];
 
 int _ion_int_init_globals_helper()
 {
-    decQuad two;
-    int32_t temp;
-    // NOTE: normally this would require overlay over a larger chunk of memory to make space for its digits, but since
-    // this will only ever hold the value 2, which fits in one digit, it will fit in the statically allocated struct.
-    decNumber two_big;
-
     // invariant needed for add
     ASSERT(((II_LONG_DIGIT)UINT32_MAX) >= (((II_LONG_DIGIT)II_MAX_DIGIT)*2));
     // invariant needed for multiply
     ASSERT((UINT64_MAX) >= ( (((II_LONG_DIGIT)II_MAX_DIGIT) * ((II_LONG_DIGIT)II_MAX_DIGIT)) + ((II_LONG_DIGIT)II_MAX_DIGIT) )); 
     // invariant needed for multiply and add
-    ASSERT((UINT64_MAX) >= ( (((II_LONG_DIGIT)II_MAX_DIGIT) * ((II_LONG_DIGIT)II_MAX_DIGIT)) + (((II_LONG_DIGIT)II_MAX_DIGIT)*2) )); 
+    ASSERT((UINT64_MAX) >= ( (((II_LONG_DIGIT)II_MAX_DIGIT) * ((II_LONG_DIGIT)II_MAX_DIGIT)) + (((II_LONG_DIGIT)II_MAX_DIGIT)*2) ));
 
-    decContextDefault(&g_Context, DEC_INIT_DECQUAD); // TODO do SOMETHING about this...
-    g_Context.digits = 100; // TODO remove once something is done about this
-
-
-    temp = (int32_t)(II_BASE / 2);
-
-    decQuadFromInt32(&two, 2);
-    decQuadFromInt32(&g_digit_base, temp); // TODO can't this all just be done in decQuadFromUInt32?
-    decQuadMultiply(&g_digit_base, &g_digit_base, &two, &g_Context);
-
+    decQuadFromUInt32(&g_digit_base, II_BASE);
     g_digit_base_big = (decNumber *)gDigitBaseBigBuffer;
-    decNumberFromInt32(&two_big, 2);
-    decNumberFromInt32(g_digit_base_big, temp);
-    decNumberMultiply(g_digit_base_big, g_digit_base_big, &two_big, &g_Context);
-
-    decQuadFromInt32(&g_decQuad_Mask, (int32_t)II_MASK);
-    decQuadFromInt32(&g_decQuad_Shift, (int32_t)II_SHIFT);
+    decNumberFromUInt32(g_digit_base_big, II_BASE);
 
     return 0;
 }

@@ -13,6 +13,7 @@
  */
 
 #include "ion_event_stream.h"
+#include "ion_test_util.h"
 #include <iostream>
 #include <ion_helpers.h>
 
@@ -273,12 +274,8 @@ iERR read_all(hREADER hreader, IonEventStream *stream) {
 iERR read_value_stream_from_string(const char *ion_string, IonEventStream *stream) {
     iENTER;
     hREADER      reader;
-    ION_READER_OPTIONS options;
-    memset(&options, 0, sizeof(ION_READER_OPTIONS));
-    options.max_container_depth = 100; // Arbitrarily high; if any test vector exceeds this depth, raise this threshold.
-    options.max_annotation_count = 100; // "
 
-    IONCHECK(ion_reader_open_buffer(&reader, (BYTE *)ion_string, (SIZE)strlen(ion_string), &options));
+    IONCHECK(ion_test_new_text_reader(ion_string, &reader));
     IONCHECK(read_all(reader, stream));
     IONCHECK(ion_reader_close(reader));
     iRETURN;
@@ -288,9 +285,7 @@ iERR read_value_stream_from_bytes(const BYTE *ion_string, SIZE len, IonEventStre
     iENTER;
     hREADER      reader;
     ION_READER_OPTIONS options;
-    memset(&options, 0, sizeof(ION_READER_OPTIONS));
-    options.max_container_depth = 100; // Arbitrarily high; if any test vector exceeds this depth, raise this threshold.
-    options.max_annotation_count = 100; // "
+    ion_test_initialize_reader_options(&options);
     if (catalog) {
         options.pcatalog = catalog;
     }
@@ -313,9 +308,7 @@ iERR read_value_stream(IonEventStream *stream, READER_INPUT_TYPE input_type, std
     long         result;
 
     ION_READER_OPTIONS options;
-    memset(&options, 0, sizeof(ION_READER_OPTIONS));
-    options.max_container_depth = 100; // Arbitrarily high; if any test vector exceeds this depth, raise this threshold.
-    options.max_annotation_count = 100; // "
+    ion_test_initialize_reader_options(&options);
     options.pcatalog = catalog;
 
     const char *pathname_c_str = pathname.c_str();
@@ -441,7 +434,7 @@ iERR write_value_stream(IonEventStream *stream, VECTOR_TEST_TYPE test_type, ION_
     IONCHECK(ion_stream_open_memory_only(&ion_stream)); // TODO more types of output streams?
     hWRITER writer;
     ION_WRITER_OPTIONS options;
-    memset(&options, 0, sizeof(options));
+    ion_test_initialize_writer_options(&options);
     options.output_as_binary = (test_type == ROUNDTRIP_BINARY);
     options.pcatalog = catalog;
 

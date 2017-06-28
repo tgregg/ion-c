@@ -110,6 +110,14 @@ typedef struct _ion_reader_options
      */
     ION_CATALOG *pcatalog;
 
+    /** Handle to the decNumber context for the reader to use. This allows configuration of the maximum number of
+     * decimal digits, decimal exponent range, etc. See decContextDefault in decContext.h for simple initialization.
+     *
+     * If NULL, the reader will initialize its decimal context by calling decContextDefault with the DEC_INIT_DECQUAD
+     * option, which results in a maximum of 34 decimal digits and an exponent range of [-6143, 6144].
+     */
+    decContext *decimal_context;
+
 } ION_READER_OPTIONS;
 
 //

@@ -471,9 +471,14 @@ iERR _ion_reader_initialize(ION_READER *preader, BYTE *version_buffer, SIZE vers
     }
     preader->_catalog = HANDLE_TO_PTR(hcatalog, ION_CATALOG);
 
+
     // initialize decimal context
-    decContextDefault(&preader->_deccontext, DEC_INIT_DECQUAD);
-    preader->_deccontext.digits = 100; // TODO allow user to provide a dec context?
+    if (preader->options.decimal_context == NULL) {
+        decContextDefault(&preader->_deccontext, DEC_INIT_DECQUAD);
+    }
+    else {
+        memcpy(&preader->_deccontext, preader->options.decimal_context, sizeof(decContext));
+    }
 
     // we start our symbol table out with the system symbol table
     preader->_current_symtab = system;
