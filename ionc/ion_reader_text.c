@@ -48,6 +48,7 @@ double _ION_FLOAT64_NAN() {
 
 #define IST_RECORD( NAME, TTT, STATE, FLAGS ) ION_SUB_TYPE NAME = & g_##NAME ;
 #include "ion_sub_type_records.h"
+#include "ion_decimal_impl.h"
 
 /**
  *        open the reader, allocate supporting buffers for fieldname, annotations,
@@ -1561,13 +1562,13 @@ iERR _ion_reader_text_read_double(ION_READER *preader, double *p_value)
     iRETURN;
 }
 
-iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumber *p_number, BOOL *p_is_quad_set)
+iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumber **p_num)
 {
     iENTER;
     ION_TEXT_READER *text = &preader->typed_reader.text;
     char            *cp, c_save = 0;
     uint32_t        saved_status;
-    BOOL            is_quad_set = TRUE;
+    SIZE            decimal_digits = 0;
 
     ASSERT(preader);
     ASSERT(p_quad);
@@ -1592,6 +1593,9 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumb
             *cp = 'e';
             break;
         }
+        if (*cp != '.') {
+            decimal_digits++;
+        }
     }
     // replace the 'd' with a 'e' to make decQuadFromString happy (if there is a 'd')
     if (*cp) {
@@ -1601,17 +1605,15 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumb
     saved_status = decContextSaveStatus(&preader->_deccontext, DEC_Inexact);
     decContextClearStatus(&preader->_deccontext, DEC_Inexact);
     decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
-    if (p_number && decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
-        decNumberFromString(p_number, text->_scanner._value_image.value, &preader->_deccontext);
-        is_quad_set = FALSE;
+    if (p_num && decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
+        IONCHECK(_ion_decimal_number_alloc(preader, decimal_digits, p_num));
+        decNumberFromString(*p_num, text->_scanner._value_image.value, &preader->_deccontext);
     }
     decContextRestoreStatus(&preader->_deccontext, saved_status, DEC_Inexact);
     // restore the string is we munged it, just in case someone else wants to use if later
     if (*cp) {
         *cp = c_save;
     }
-
-    if (p_is_quad_set) *p_is_quad_set = is_quad_set;
 
     iRETURN;
 }

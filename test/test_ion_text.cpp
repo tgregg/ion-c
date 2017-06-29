@@ -590,16 +590,11 @@ TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
     hREADER reader;
     ION_TYPE type;
     ION_DECIMAL ion_decimal;
-    char decimal_buf[512];
-    decNumber *decimal = (decNumber *)decimal_buf;
 
     hWRITER writer = NULL;
     ION_STREAM *ion_stream = NULL;
     BYTE *result;
     SIZE result_len;
-
-    ion_decimal.value.num_value = decimal;
-    ion_decimal.type = ION_DECIMAL_TYPE_NUMBER;
 
     ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));

@@ -58,8 +58,10 @@ ION_API_EXPORT iERR ion_decimal_get_double_value   (decQuad *dec, double *p_valu
  * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
  * equivalent for the normalized values (even for zero).
  */
+// TODO get rid of this in favor of JUST the ION_DECIMAL version
 ION_API_EXPORT iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
-ION_API_EXPORT iERR ion_decimal_big_equals(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal);
+// TODO rename to ion_decimal_equals
+ION_API_EXPORT iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal);
 
 #ifdef __cplusplus
 }

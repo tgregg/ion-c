@@ -295,7 +295,7 @@ iERR _ion_reader_binary_read_int32          (ION_READER *preader, int32_t *p_val
 iERR _ion_reader_binary_read_int64          (ION_READER *preader, int64_t *p_value);
 iERR _ion_reader_binary_read_ion_int        (ION_READER *preader, ION_INT *p_value);
 iERR _ion_reader_binary_read_double         (ION_READER *preader, double *p_value);
-iERR _ion_reader_binary_read_decimal        (ION_READER *preader, decQuad *p_value, decNumber *p_num, BOOL *p_is_quad_set);
+iERR _ion_reader_binary_read_decimal        (ION_READER *preader, decQuad *p_value, decNumber **p_num);
 iERR _ion_reader_binary_read_timestamp      (ION_READER *preader, iTIMESTAMP p_value);
 iERR _ion_reader_binary_read_symbol_sid     (ION_READER *preader, SID *p_value);
 iERR _ion_reader_binary_read_symbol_sid_helper(ION_READER *preader, ION_BINARY_READER *binary, SID *p_value);

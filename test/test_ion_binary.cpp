@@ -12,7 +12,6 @@
  * language governing permissions and limitations under the License.
  */
 
-#include <decNumber.h>
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"
@@ -351,10 +350,6 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     hREADER reader;
     ION_TYPE type;
     ION_DECIMAL ion_decimal_before, ion_decimal_after;
-    char decimal_buf_before[512];
-    decNumber *decimal_before = (decNumber *)decimal_buf_before;
-    char decimal_buf_after[512];
-    decNumber *decimal_after = (decNumber *)decimal_buf_after;
     BOOL equals;
 
     hWRITER writer = NULL;
@@ -362,18 +357,14 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     BYTE *result;
     SIZE result_len;
 
-    ion_decimal_before.value.num_value = decimal_before;
-    ion_decimal_before.type = ION_DECIMAL_TYPE_NUMBER;
-    ion_decimal_after.value.num_value = decimal_after;
-    ion_decimal_after.type = ION_DECIMAL_TYPE_NUMBER;
-
     ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_before));
     ION_ASSERT_OK(ion_reader_close(reader));
     // Make sure we start with a full-fidelity decimal, otherwise the test would incorrectly succeed.
-    ASSERT_EQ(53, decimal_before->digits);
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal_before.type);
+    ASSERT_EQ(53, ion_decimal_before.value.num_value->digits);
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
     ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal_before));
@@ -383,7 +374,7 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_after));
-    ION_ASSERT_OK(ion_decimal_big_equals(decimal_before, decimal_after, &((ION_READER *)reader)->_deccontext, &equals));
+    ION_ASSERT_OK(ion_decimal_equals_iondec(&ion_decimal_before, &ion_decimal_after, &((ION_READER *)reader)->_deccontext, &equals));
     ION_ASSERT_OK(ion_reader_close(reader));
 
     ASSERT_TRUE(equals);

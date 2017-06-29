@@ -14,8 +14,19 @@
 
 #include "ion.h"
 #include "ion_helpers.h"
+#include "ion_decimal_impl.h"
 
-iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
+iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_number) {
+    iENTER;
+    ASSERT(p_number);
+    *p_number = ion_alloc_with_owner(owner, sizeof(decNumber) + ((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0)));
+    if (*p_number == NULL) {
+        FAILWITH(IERR_NO_MEMORY);
+    }
+    iRETURN;
+}
+
+iERR _ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
     iENTER;
     decQuad left_canonical, right_canonical;
     uint8_t left_coefficient[DECQUAD_Pmax], right_coefficient[DECQUAD_Pmax];
@@ -52,7 +63,14 @@ not_equal:
     iRETURN;
 }
 
-iERR ion_decimal_big_equals(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal) {
+iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
+    iENTER;
+    ASSERT(is_equal);
+    IONCHECK(_ion_decimal_equals_quad(left, right, context, is_equal));
+    iRETURN;
+}
+
+iERR _ion_decimal_equals_number(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal) {
     iENTER;
     // Note: all decNumbers are canonical.
     if (!left || !right || !context || !is_equal) FAILWITH(IERR_INVALID_ARG);
@@ -77,6 +95,26 @@ iERR ion_decimal_big_equals(const decNumber *left, const decNumber *right, decCo
     SUCCEED();
 not_equal:
     *is_equal = FALSE;
+    iRETURN;
+}
+
+iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
+    iENTER;
+    ASSERT(is_equal);
+    if (left->type != right->type) {
+        *is_equal = FALSE;
+        SUCCEED();
+    }
+    switch (left->type) {
+        case ION_DECIMAL_TYPE_QUAD:
+            IONCHECK(_ion_decimal_equals_quad(&left->value.quad_value, &right->value.quad_value, context, is_equal));
+            break;
+        case ION_DECIMAL_TYPE_NUMBER:
+            IONCHECK(_ion_decimal_equals_number(left->value.num_value, right->value.num_value, context, is_equal));
+            break;
+        default:
+            FAILWITH(IERR_INVALID_ARG);
+    }
     iRETURN;
 }
 

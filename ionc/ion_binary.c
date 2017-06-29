@@ -13,9 +13,8 @@
  */
 
 #include <limits.h>
-#include <decNumber.h>
-#include <decContext.h>
 #include "ion_internal.h"
+#include "ion_decimal_impl.h"
 
 // These field formats are always used in some context that clearly indicates the number of octets in the field.
 int ion_binary_len_uint_64(uint64_t value) {
@@ -392,14 +391,12 @@ iERR ion_binary_read_double(ION_STREAM *pstream, int32_t len, double *p_value)
 }
 
 iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t exponent, decContext *context,
-                                     decQuad *p_quad, decNumber *p_num, BOOL *p_is_quad_set) {
+                                     decQuad *p_quad, decNumber **p_num) {
     iENTER;
     ION_INT mantissa;
     SIZE decimal_digits;
-    BOOL    is_quad_set = TRUE;
 
     ASSERT(p_quad);
-    ASSERT(p_is_quad_set);
 
     IONCHECK(ion_int_init(&mantissa, NULL));
     IONCHECK(ion_binary_read_ion_int_signed(pstream, len, &mantissa));
@@ -413,23 +410,21 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
         decQuadSetExponent(p_quad, context, exponent);
     }
     else {
-        IONCHECK(ion_int_to_decimal_number(&mantissa, p_num, context));
-        p_num->exponent = exponent;
-        is_quad_set = FALSE;
+        // TODO the decimal's owner should really be the reader, not the stream... that requires a refactor.
+        IONCHECK(_ion_decimal_number_alloc(pstream, decimal_digits, p_num));
+        IONCHECK(ion_int_to_decimal_number(&mantissa, *p_num, context));
+        (*p_num)->exponent = exponent;
     }
-    *p_is_quad_set = is_quad_set;
     iRETURN;
 }
 
-iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *context, decQuad *p_quad, decNumber *p_num,
-                             BOOL *p_is_quad_set)
+iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *context, decQuad *p_quad, decNumber **p_num)
 {
     iENTER;
     int64_t start_exp, finish_exp, value_len;
     uint64_t mantissa;
     int32_t exponent;
     BOOL    isNegative;
-    BOOL    is_quad_set = TRUE;
 
     ASSERT(pstream != NULL);
     ASSERT(len >= 0);
@@ -469,11 +464,9 @@ iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *conte
             ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_quad);
         }
         else {
-            IONCHECK(_ion_binary_read_decimal_helper(pstream, (int32_t) value_len, exponent, context, p_quad,
-                                                     p_num, &is_quad_set));
+            IONCHECK(_ion_binary_read_decimal_helper(pstream, (int32_t) value_len, exponent, context, p_quad, p_num));
         }
     }
-    if (p_is_quad_set) *p_is_quad_set = is_quad_set;
     iRETURN;
 }
 

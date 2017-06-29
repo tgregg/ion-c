@@ -1290,7 +1290,7 @@ iERR ion_timestamp_binary_read(ION_STREAM *stream, int32_t len, decContext *cont
 
     // now we read in our actual "milliseconds since the epoch"
     // TODO fail on DEC_Inexact?
-    IONCHECK(ion_binary_read_decimal(stream, len, context, &ptime->fraction, NULL, NULL)); // TODO make timestamp's fraction an ION_DECIMAL so it can support full precision?
+    IONCHECK(ion_binary_read_decimal(stream, len, context, &ptime->fraction, NULL)); // TODO make timestamp's fraction an ION_DECIMAL so it can support full precision?
     if (decQuadIsSigned(&ptime->fraction)) {
         if (decQuadIsZero(&ptime->fraction)) {
             // Negative-zero fractional seconds are normalized to positive-zero.
