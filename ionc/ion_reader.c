@@ -13,8 +13,8 @@
  */
 
 #include <decNumber.h>
-#include <decContext.h>
 #include "ion_internal.h"
+
 #define IONCLOSEpREADER(x)  {   if (x != NULL)                                  \
                                 {                                               \
                                     UPDATEERROR(_ion_reader_close_helper(x));   \
@@ -1402,10 +1402,10 @@ iERR _ion_reader_read_decimal_helper(ION_READER *preader, decQuad *p_value)
 
     switch(preader->type) {
     case ion_type_text_reader:
-        IONCHECK(_ion_reader_text_read_decimal(preader, p_value));
+        IONCHECK(_ion_reader_text_read_decimal(preader, p_value, NULL, NULL));
         break;
     case ion_type_binary_reader:
-        IONCHECK(_ion_reader_binary_read_decimal(preader, p_value));
+        IONCHECK(_ion_reader_binary_read_decimal(preader, p_value, NULL, NULL));
         break;
     case ion_type_unknown_reader:
     default:
@@ -1415,7 +1415,7 @@ iERR _ion_reader_read_decimal_helper(ION_READER *preader, decQuad *p_value)
     iRETURN;
 }
 
-iERR ion_reader_read_decimal_big(hREADER hreader, decNumber *p_value)
+iERR ion_reader_read_ion_decimal(hREADER hreader, ION_DECIMAL *p_value)
 {
     iENTER;
     ION_READER *preader;
@@ -1424,30 +1424,39 @@ iERR ion_reader_read_decimal_big(hREADER hreader, decNumber *p_value)
     preader = HANDLE_TO_PTR(hreader, ION_READER);
     if (!p_value) FAILWITH(IERR_INVALID_ARG);
 
-    IONCHECK(_ion_reader_read_decimal_big_helper(preader, p_value));
+    IONCHECK(_ion_reader_read_ion_decimal_helper(preader, p_value));
 
     iRETURN;
 }
 
-iERR _ion_reader_read_decimal_big_helper(ION_READER *preader, decNumber *p_value)
+iERR _ion_reader_read_ion_decimal_helper(ION_READER *preader, ION_DECIMAL *p_value)
 {
     iENTER;
+    BOOL is_quad_set;
+    decNumber *num_value = p_value->value.num_value;
 
     ASSERT(preader);
     ASSERT(p_value);
 
     switch(preader->type) {
         case ion_type_text_reader:
-            IONCHECK(_ion_reader_text_read_decimal_big(preader, p_value));
+            IONCHECK(_ion_reader_text_read_decimal(preader, &p_value->value.quad_value, num_value, &is_quad_set));
             break;
         case ion_type_binary_reader:
-            IONCHECK(_ion_reader_binary_read_decimal_big(preader, p_value));
+            IONCHECK(_ion_reader_binary_read_decimal(preader, &p_value->value.quad_value, num_value, &is_quad_set));
             break;
         case ion_type_unknown_reader:
         default:
             FAILWITH(IERR_INVALID_STATE);
     }
-
+    if (is_quad_set) {
+        p_value->type = ION_DECIMAL_TYPE_QUAD;
+    }
+    else {
+        p_value->type = ION_DECIMAL_TYPE_NUMBER;
+        p_value->value.num_value = num_value; // This needs to be set to make it valid in the ION_DECIMAL's union.
+    }
+    p_value->type = (is_quad_set) ? ION_DECIMAL_TYPE_QUAD : ION_DECIMAL_TYPE_NUMBER;
     iRETURN;
 }
 

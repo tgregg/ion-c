@@ -12,7 +12,6 @@
  * language governing permissions and limitations under the License.
  */
 
-#include <decNumber.h>
 #include "ion.h"
 #include "ion_helpers.h"
 

@@ -349,7 +349,7 @@ ION_API_EXPORT iERR ion_reader_read_ion_int        (hREADER hreader, ION_INT *p_
 ION_API_EXPORT iERR ion_reader_read_long           (hREADER hreader, long *p_value);
 ION_API_EXPORT iERR ion_reader_read_double         (hREADER hreader, double *p_value);
 ION_API_EXPORT iERR ion_reader_read_decimal        (hREADER hreader, decQuad *p_value);
-ION_API_EXPORT iERR ion_reader_read_decimal_big    (hREADER hreader, decNumber *p_value);
+ION_API_EXPORT iERR ion_reader_read_ion_decimal    (hREADER hreader, ION_DECIMAL *p_value);
 
 /**
  * @return IERR_NULL_VALUE if the current value is null.timestamp.

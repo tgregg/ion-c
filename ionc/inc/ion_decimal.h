@@ -22,6 +22,32 @@
 extern "C" {
 #endif
 
+/**
+ * Determines which value of the _ion_decimal's `value` field is active.
+ */
+typedef enum {
+    ION_DECIMAL_TYPE_UNKNOWN = 0,
+    /**
+     * The _ion_decimal holds a decQuad.
+     */
+    ION_DECIMAL_TYPE_QUAD = 1,
+    /**
+     * The _ion_decimal holds a decNumber.
+     */
+    ION_DECIMAL_TYPE_NUMBER = 2,
+
+} ION_DECIMAL_TYPE;
+
+struct _ion_decimal {
+
+    ION_DECIMAL_TYPE type;
+
+    union {
+        decQuad quad_value;
+        decNumber *num_value;
+    } value;
+};
+
 //
 // support routines for decimal and timestamp values
 //

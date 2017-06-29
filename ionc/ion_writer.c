@@ -17,7 +17,6 @@
 // will contain the text or binary content, returns handle to a writer.
 //
 
-#include <decContext.h>
 #include "ion_internal.h"
 
 #define IONCLOSEpWRITER(x)   { if (x != NULL)  { UPDATEERROR(_ion_writer_close_helper(x)); x = NULL;}}
@@ -1043,10 +1042,10 @@ iERR _ion_writer_write_decimal_helper(ION_WRITER *pwriter, decQuad *value)
 
     switch (pwriter->type) {
     case ion_type_text_writer:
-        IONCHECK(_ion_writer_text_write_decimal(pwriter, value));
+        IONCHECK(_ion_writer_text_write_decimal_quad(pwriter, value));
         break;
     case ion_type_binary_writer:
-        IONCHECK(_ion_writer_binary_write_decimal(pwriter, value));
+        IONCHECK(_ion_writer_binary_write_decimal_quad(pwriter, value));
         break;
     default:
         FAILWITH(IERR_INVALID_ARG);
@@ -1055,7 +1054,7 @@ iERR _ion_writer_write_decimal_helper(ION_WRITER *pwriter, decQuad *value)
     iRETURN;
 }
 
-iERR ion_writer_write_decimal_big(hWRITER hwriter, decNumber *value)
+iERR ion_writer_write_ion_decimal(hWRITER hwriter, ION_DECIMAL *value)
 {
     iENTER;
     ION_WRITER *pwriter;
@@ -1063,12 +1062,12 @@ iERR ion_writer_write_decimal_big(hWRITER hwriter, decNumber *value)
     if (!hwriter)   FAILWITH(IERR_BAD_HANDLE);
     pwriter = HANDLE_TO_PTR(hwriter, ION_WRITER);
 
-    IONCHECK(_ion_writer_write_decimal_big_helper(pwriter, value));
+    IONCHECK(_ion_writer_write_ion_decimal_helper(pwriter, value));
 
     iRETURN;
 }
 
-iERR _ion_writer_write_decimal_big_helper(ION_WRITER *pwriter, decNumber *value)
+iERR _ion_writer_write_ion_decimal_helper(ION_WRITER *pwriter, ION_DECIMAL *value)
 {
     iENTER;
 
@@ -1076,10 +1075,28 @@ iERR _ion_writer_write_decimal_big_helper(ION_WRITER *pwriter, decNumber *value)
 
     switch (pwriter->type) {
         case ion_type_text_writer:
-        IONCHECK(_ion_writer_text_write_decimal_big(pwriter, value));
+            switch(value->type) {
+                case ION_DECIMAL_TYPE_QUAD:
+                    IONCHECK(_ion_writer_text_write_decimal_quad(pwriter, &value->value.quad_value));
+                    break;
+                case ION_DECIMAL_TYPE_NUMBER:
+                    IONCHECK(_ion_writer_text_write_decimal_number(pwriter, value->value.num_value));
+                    break;
+                default:
+                    FAILWITH(IERR_INVALID_STATE);
+            }
             break;
         case ion_type_binary_writer:
-        IONCHECK(_ion_writer_binary_write_decimal_big(pwriter, value));
+            switch(value->type) {
+                case ION_DECIMAL_TYPE_QUAD:
+                IONCHECK(_ion_writer_binary_write_decimal_quad(pwriter, &value->value.quad_value));
+                    break;
+                case ION_DECIMAL_TYPE_NUMBER:
+                IONCHECK(_ion_writer_binary_write_decimal_number(pwriter, value->value.num_value));
+                    break;
+                default:
+                FAILWITH(IERR_INVALID_STATE);
+            }
             break;
         default:
         FAILWITH(IERR_INVALID_ARG);

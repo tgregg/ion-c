@@ -159,7 +159,7 @@ ION_API_EXPORT iERR ion_writer_write_long           (hWRITER hwriter, long value
 ION_API_EXPORT iERR ion_writer_write_ion_int        (hWRITER hwriter, ION_INT *value);
 ION_API_EXPORT iERR ion_writer_write_double         (hWRITER hwriter, double value);
 ION_API_EXPORT iERR ion_writer_write_decimal        (hWRITER hwriter, decQuad *value);
-ION_API_EXPORT iERR ion_writer_write_decimal_big    (hWRITER hwriter, decNumber *value);
+ION_API_EXPORT iERR ion_writer_write_ion_decimal    (hWRITER hwriter, ION_DECIMAL *value);
 ION_API_EXPORT iERR ion_writer_write_timestamp      (hWRITER hwriter, iTIMESTAMP value);
 ION_API_EXPORT iERR ion_writer_write_symbol_sid     (hWRITER hwriter, SID value);
 ION_API_EXPORT iERR ion_writer_write_symbol         (hWRITER hwriter, iSTRING p_value);

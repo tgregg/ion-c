@@ -13,6 +13,7 @@
  */
 
 #include <decNumber.h>
+#include <inc/ion_decimal.h>
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"
@@ -588,6 +589,7 @@ TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
     const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
     hREADER reader;
     ION_TYPE type;
+    ION_DECIMAL ion_decimal;
     char decimal_buf[512];
     decNumber *decimal = (decNumber *)decimal_buf;
 
@@ -596,14 +598,17 @@ TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
     BYTE *result;
     SIZE result_len;
 
+    ion_decimal.value.num_value = decimal;
+    ion_decimal.type = ION_DECIMAL_TYPE_NUMBER;
+
     ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
-    ION_ASSERT_OK(ion_reader_read_decimal_big(reader, decimal));
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
     ION_ASSERT_OK(ion_reader_close(reader));
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
-    ION_ASSERT_OK(ion_writer_write_decimal_big(writer, decimal));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal));
     ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
 
     ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl

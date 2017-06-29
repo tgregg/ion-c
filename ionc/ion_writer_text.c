@@ -519,7 +519,7 @@ iERR _ion_writer_text_write_double(ION_WRITER *pwriter, double value)
     iRETURN;
 }
 
-iERR _ion_writer_text_write_decimal(ION_WRITER *pwriter, decQuad *value)
+iERR _ion_writer_text_write_decimal_quad(ION_WRITER *pwriter, decQuad *value)
 {
     iENTER;
     char image[DECQUAD_String];
@@ -562,7 +562,7 @@ iERR _ion_writer_text_write_decimal(ION_WRITER *pwriter, decQuad *value)
     iRETURN;
 }
 
-iERR _ion_writer_text_write_decimal_big(ION_WRITER *pwriter, decNumber *value)
+iERR _ion_writer_text_write_decimal_number(ION_WRITER *pwriter, decNumber *value)
 {
     iENTER;
     char *image, *dec, *exp, *start;

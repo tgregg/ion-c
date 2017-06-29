@@ -1561,15 +1561,16 @@ iERR _ion_reader_text_read_double(ION_READER *preader, double *p_value)
     iRETURN;
 }
 
-
-iERR _ion_reader_text_read_decimal_helper(ION_READER *preader, decQuad *p_quad, decNumber *p_number)
+iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumber *p_number, BOOL *p_is_quad_set)
 {
     iENTER;
     ION_TEXT_READER *text = &preader->typed_reader.text;
     char            *cp, c_save = 0;
+    uint32_t        saved_status;
+    BOOL            is_quad_set = TRUE;
 
     ASSERT(preader);
-    ASSERT(p_quad || p_number);
+    ASSERT(p_quad);
 
     if (text->_state == IPS_ERROR 
      || text->_state == IPS_NONE 
@@ -1597,34 +1598,21 @@ iERR _ion_reader_text_read_decimal_helper(ION_READER *preader, decQuad *p_quad, 
         c_save = *cp;
         *cp = 'e';
     }
-
-    if (p_number) {
+    saved_status = decContextSaveStatus(&preader->_deccontext, DEC_Inexact);
+    decContextClearStatus(&preader->_deccontext, DEC_Inexact);
+    decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
+    if (p_number && decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
         decNumberFromString(p_number, text->_scanner._value_image.value, &preader->_deccontext);
+        is_quad_set = FALSE;
     }
-    else {
-        decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
-    }
-
+    decContextRestoreStatus(&preader->_deccontext, saved_status, DEC_Inexact);
     // restore the string is we munged it, just in case someone else wants to use if later
     if (*cp) {
         *cp = c_save;
     }
-    SUCCEED();
 
-    iRETURN;
-}
+    if (p_is_quad_set) *p_is_quad_set = is_quad_set;
 
-iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_value) {
-    iENTER;
-    ASSERT(p_value);
-    IONCHECK(_ion_reader_text_read_decimal_helper(preader, p_value, NULL));
-    iRETURN;
-}
-
-iERR _ion_reader_text_read_decimal_big(ION_READER *preader, decNumber *p_value) {
-    iENTER;
-    assert(p_value);
-    IONCHECK(_ion_reader_text_read_decimal_helper(preader, NULL, p_value));
     iRETURN;
 }
 

@@ -975,7 +975,7 @@ iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad, decContext *context)
     iRETURN;
 }
 
-iERR ion_int_to_decimal_big(ION_INT *iint, decNumber *p_value, decContext *context)
+iERR ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *context)
 {
     iENTER;
     II_DIGIT *digits, *end, digit;

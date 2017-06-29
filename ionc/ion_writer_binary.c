@@ -656,8 +656,8 @@ iERR _ion_writer_binary_decimal_quad_len_and_mantissa(decQuad *value, decQuad *m
     iRETURN;
 }
 
-iERR _ion_writer_binary_decimal_big_len_and_mantissa(decNumber *value, decContext *context, ION_INT *p_int_mantissa,
-                                                     SIZE *p_mantissa_len, SIZE *p_len) {
+iERR _ion_writer_binary_decimal_number_len_and_mantissa(decNumber *value, decContext *context, ION_INT *p_int_mantissa,
+                                                        SIZE *p_mantissa_len, SIZE *p_len) {
     iENTER;
     ASSERT(!decNumberIsZero(value));
 
@@ -719,7 +719,7 @@ iERR _ion_writer_binary_write_header(ION_WRITER *pwriter, int tid, int len, int 
 /**
  * Write a decimal with a mantissa that does not fit in 64 bits.
  */
-iERR _ion_writer_binary_write_decimal_quad(ION_WRITER *pwriter, decQuad *value, decQuad *dec_mantissa, int32_t exponent)
+iERR _ion_writer_binary_write_decimal_quad_helper(ION_WRITER *pwriter, decQuad *value, decQuad *dec_mantissa, int32_t exponent)
 {
     iENTER;
     ION_INT int_mantissa;
@@ -752,14 +752,14 @@ iERR _ion_writer_binary_write_decimal_small(ION_WRITER *pwriter, uint64_t mantis
     iRETURN;
 }
 
-iERR _ion_writer_binary_write_decimal_big_helper(ION_WRITER *pwriter, decNumber *value)
+iERR _ion_writer_binary_write_decimal_number_helper(ION_WRITER *pwriter, decNumber *value)
 {
     iENTER;
     ION_INT int_mantissa;
     SIZE int_mantissa_len;
     int len = 0, patch_len;
-    IONCHECK(_ion_writer_binary_decimal_big_len_and_mantissa(value, &pwriter->deccontext, &int_mantissa,
-                                                             &int_mantissa_len, &len));
+    IONCHECK(_ion_writer_binary_decimal_number_len_and_mantissa(value, &pwriter->deccontext, &int_mantissa,
+                                                                &int_mantissa_len, &len));
     IONCHECK(_ion_writer_binary_write_header(pwriter, TID_DECIMAL, len, &patch_len));
     IONCHECK(_ion_writer_binary_write_decimal_helper(pwriter->_typed_writer.binary._value_stream, &int_mantissa,
                                                      int_mantissa_len, value->exponent));
@@ -792,7 +792,7 @@ iERR _ion_writer_binary_decimal_quad_components(const decQuad *value, decContext
     iRETURN;
 }
 
-iERR _ion_writer_binary_write_decimal(ION_WRITER *pwriter, decQuad *value)
+iERR _ion_writer_binary_write_decimal_quad(ION_WRITER *pwriter, decQuad *value)
 {
     iENTER;
     uint64_t small_mantissa;
@@ -809,7 +809,7 @@ iERR _ion_writer_binary_write_decimal(ION_WRITER *pwriter, decQuad *value)
                                                         &exponent, &is_negative, &overflow));
 
     if (overflow) {
-        IONCHECK(_ion_writer_binary_write_decimal_quad(pwriter, value, &big_mantissa, exponent));
+        IONCHECK(_ion_writer_binary_write_decimal_quad_helper(pwriter, value, &big_mantissa, exponent));
     }
     else {
         IONCHECK(_ion_writer_binary_write_decimal_small(pwriter, small_mantissa, exponent, is_negative));
@@ -818,7 +818,7 @@ iERR _ion_writer_binary_write_decimal(ION_WRITER *pwriter, decQuad *value)
     iRETURN;
 }
 
-iERR _ion_writer_binary_write_decimal_big(ION_WRITER *pwriter, decNumber *value)
+iERR _ion_writer_binary_write_decimal_number(ION_WRITER *pwriter, decNumber *value)
 {
     iENTER;
     uint64_t small_mantissa = 0;
@@ -830,7 +830,7 @@ iERR _ion_writer_binary_write_decimal_big(ION_WRITER *pwriter, decNumber *value)
     // 2^64 - 1 is 20 decimal digits, so anything below 20 will fit in 64 bits. This is an optimization, so it's not
     // important to identify the 20-digit values that could fit in 64 bits.
     if (value->digits > 19) {
-        IONCHECK(_ion_writer_binary_write_decimal_big_helper(pwriter, value));
+        IONCHECK(_ion_writer_binary_write_decimal_number_helper(pwriter, value));
     }
     else {
         for (i = 0; i < DECDPUN; i++) {
@@ -929,7 +929,7 @@ int _ion_writer_binary_timestamp_len_without_fraction( ION_TIMESTAMP *ptime)
 /**
  * Write a timestamp fraction with a mantissa that does not fit in 64 bits.
  */
-iERR _ion_writer_binary_write_timestamp_fraction_big(ION_WRITER *pwriter, ION_TIMESTAMP *value, decQuad *dec_mantissa, int32_t exponent)
+iERR _ion_writer_binary_write_timestamp_fraction_quad(ION_WRITER *pwriter, ION_TIMESTAMP *value, decQuad *dec_mantissa, int32_t exponent)
 {
     iENTER;
     ION_INT int_mantissa;
@@ -983,7 +983,7 @@ iERR _ion_writer_binary_write_timestamp_with_fraction( ION_WRITER *pwriter, ION_
                                                         &big_mantissa, &exponent, &is_negative, &overflow));
 
     if (overflow) {
-        IONCHECK(_ion_writer_binary_write_timestamp_fraction_big(pwriter, ptime, &big_mantissa, exponent));
+        IONCHECK(_ion_writer_binary_write_timestamp_fraction_quad(pwriter, ptime, &big_mantissa, exponent));
     }
     else {
         IONCHECK(_ion_writer_binary_write_timestamp_fraction_small(pwriter, ptime, small_mantissa, exponent, is_negative));

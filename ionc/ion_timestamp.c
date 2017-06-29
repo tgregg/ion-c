@@ -532,7 +532,8 @@ iERR ion_timestamp_parse(ION_TIMESTAMP *ptime, char *buffer, SIZE buf_length, SI
         if (cp > end_of_buffer) FAILWITH(IERR_INVALID_TIMESTAMP);
 
         *dst = 0; // null terminate the string (it's why we copied it after all)
-        decQuadFromString(&fraction, temp, pcontext);
+        // TODO fail on DEC_Inexact?
+        decQuadFromString(&fraction, temp, pcontext); // TODO timestamp fraction as ION_DECIMAL to support full precision?
 
 
 end_of_time:
@@ -663,7 +664,7 @@ end_of_days:
             ptime->seconds   = 0;
         }
         if (IS_FLAG_ON(ptime->precision, ION_TT_BIT_FRAC)) {
-            decQuadCopy(&ptime->fraction, &fraction);
+            decQuadCopy(&ptime->fraction, &fraction);  // TODO timestamp fraction as ION_DECIMAL to support full precision?
         }
         // No need to zero ptime->fraction here -- that is taken care of by _ion_timestamp_initialize.
     }
@@ -1288,7 +1289,8 @@ iERR ion_timestamp_binary_read(ION_STREAM *stream, int32_t len, decContext *cont
     if (len == 0) goto timestamp_is_finished;
 
     // now we read in our actual "milliseconds since the epoch"
-    IONCHECK(ion_binary_read_decimal(stream, len, context, &ptime->fraction));
+    // TODO fail on DEC_Inexact?
+    IONCHECK(ion_binary_read_decimal(stream, len, context, &ptime->fraction, NULL, NULL)); // TODO make timestamp's fraction an ION_DECIMAL so it can support full precision?
     if (decQuadIsSigned(&ptime->fraction)) {
         if (decQuadIsZero(&ptime->fraction)) {
             // Negative-zero fractional seconds are normalized to positive-zero.
