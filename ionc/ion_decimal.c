@@ -16,17 +16,58 @@
 #include "ion_helpers.h"
 #include "ion_decimal_impl.h"
 
+#define ION_DECNUMBER_UNITS_SIZE(decimal_digits) \
+     (sizeof(decNumberUnit) * (((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0))))
+
+#define ION_DECNUMBER_SIZE(decimal_digits) (sizeof(decNumber) + ION_DECNUMBER_UNITS_SIZE(decimal_digits))
+
 iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_number) {
     iENTER;
     ASSERT(p_number);
-    *p_number = ion_alloc_with_owner(owner, sizeof(decNumber) + ((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0)));
+    *p_number = ion_alloc_with_owner(owner, ION_DECNUMBER_SIZE(decimal_digits));
     if (*p_number == NULL) {
         FAILWITH(IERR_NO_MEMORY);
     }
     iRETURN;
 }
 
-iERR _ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
+iERR ion_decimal_claim(ION_DECIMAL *value) {
+    iENTER;
+    decNumber *copy;
+
+    switch (value->type) {
+        case ION_DECIMAL_TYPE_QUAD:
+            // Nothing needs to be done; the decQuad lives within the ION_DECIMAL.
+            break;
+        case ION_DECIMAL_TYPE_NUMBER:
+            // The decNumber may have been allocated with an owner, meaning its memory will go out of scope when that
+            // owner is closed. This copy extends that scope until ion_decimal_release.
+            copy = ion_xalloc((size_t)ION_DECNUMBER_SIZE(value->value.num_value->digits));
+            decNumberCopy(copy, value->value.num_value);
+            value->value.num_value = copy;
+            break;
+        default:
+            FAILWITH(IERR_INVALID_ARG);
+    }
+    iRETURN;
+}
+
+iERR ion_decimal_release(ION_DECIMAL *value) {
+    iENTER;
+    switch (value->type) {
+        case ION_DECIMAL_TYPE_QUAD:
+            // Nothing needs to be done; the decQuad lives within the ION_DECIMAL.
+            break;
+        case ION_DECIMAL_TYPE_NUMBER:
+            ion_xfree(value->value.num_value);
+            break;
+        default:
+        FAILWITH(IERR_INVALID_ARG);
+    }
+    iRETURN;
+}
+
+iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
     iENTER;
     decQuad left_canonical, right_canonical;
     uint8_t left_coefficient[DECQUAD_Pmax], right_coefficient[DECQUAD_Pmax];
@@ -63,13 +104,6 @@ not_equal:
     iRETURN;
 }
 
-iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
-    iENTER;
-    ASSERT(is_equal);
-    IONCHECK(_ion_decimal_equals_quad(left, right, context, is_equal));
-    iRETURN;
-}
-
 iERR _ion_decimal_equals_number(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal) {
     iENTER;
     // Note: all decNumbers are canonical.
@@ -87,7 +121,7 @@ iERR _ion_decimal_equals_number(const decNumber *left, const decNumber *right, d
         goto not_equal;
     }
 
-    if (memcmp(left->lsu, right->lsu, (size_t)((right->digits / DECDPUN)) + ((right->digits % DECDPUN) ? 1 : 0))) {
+    if (memcmp(left->lsu, right->lsu, ION_DECNUMBER_UNITS_SIZE(right->digits))) {
         goto not_equal;
     }
 
@@ -98,7 +132,7 @@ not_equal:
     iRETURN;
 }
 
-iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
+iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
     iENTER;
     ASSERT(is_equal);
     if (left->type != right->type) {
@@ -107,7 +141,7 @@ iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right
     }
     switch (left->type) {
         case ION_DECIMAL_TYPE_QUAD:
-            IONCHECK(_ion_decimal_equals_quad(&left->value.quad_value, &right->value.quad_value, context, is_equal));
+            IONCHECK(ion_decimal_equals_quad(&left->value.quad_value, &right->value.quad_value, context, is_equal));
             break;
         case ION_DECIMAL_TYPE_NUMBER:
             IONCHECK(_ion_decimal_equals_number(left->value.num_value, right->value.num_value, context, is_equal));
@@ -115,6 +149,40 @@ iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right
         default:
             FAILWITH(IERR_INVALID_ARG);
     }
+    iRETURN;
+}
+
+#define ION_DECIMAL_AS_QUAD(ion_decimal) &ion_decimal->value.quad_value
+#define ION_DECIMAL_AS_NUMBER(ion_decimal) ion_decimal->value.num_value
+
+#define ION_DECIMAL_IF_QUAD(ion_decimal) \
+decQuad *quad_value; \
+decNumber *num_value; \
+switch(ion_decimal->type) { \
+    case ION_DECIMAL_TYPE_QUAD: \
+        quad_value = ION_DECIMAL_AS_QUAD(ion_decimal);
+
+#define ION_DECIMAL_ELSE_IF_NUMBER(ion_decimal) \
+        break; \
+    case ION_DECIMAL_TYPE_NUMBER: \
+        num_value = ION_DECIMAL_AS_NUMBER(ion_decimal);
+
+#define ION_DECIMAL_ENDIF \
+        break; \
+    default: \
+        FAILWITH(IERR_INVALID_ARG); \
+}
+
+
+iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
+    iENTER;
+    ION_DECIMAL_IF_QUAD(value) {
+        decQuadToString(quad_value, p_string);
+    }
+    ION_DECIMAL_ELSE_IF_NUMBER(value) {
+        decNumberToString(num_value, p_string);
+    }
+    ION_DECIMAL_ENDIF;
     iRETURN;
 }
 

@@ -558,55 +558,39 @@ TEST(IonTextSymbol, ReaderReadsLocalSymbolsFromIdentifiers) {
 
     ION_ASSERT_OK(ion_reader_close(reader));
 }
-/* SHOULD fail; decQuad can't handle that much precision.
-TEST(IonTextDecimal, ReaderPreservesFullFidelity) {
-    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
-    hREADER reader;
-    ION_TYPE type;
-    decQuad decimal;
 
-    hWRITER writer = NULL;
-    ION_STREAM *ion_stream = NULL;
-    BYTE *result;
-    SIZE result_len;
-
-    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
-    ION_ASSERT_OK(ion_reader_next(reader, &type));
-    ASSERT_EQ(tid_DECIMAL, type);
-    ION_ASSERT_OK(ion_reader_read_decimal(reader, &decimal));
-    ION_ASSERT_OK(ion_reader_close(reader));
-
-    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
-    ION_ASSERT_OK(ion_writer_write_decimal(writer, &decimal));
-    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
-
-    ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
-                                                << std::string((char *)result, result_len);
-    ASSERT_STREQ(text_decimal, (char *)result);
-}
-*/
 TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
-    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
+    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875\n1.1999999999999999555910790149937383830547332763671875";
     hREADER reader;
     ION_TYPE type;
-    ION_DECIMAL ion_decimal;
+    ION_DECIMAL ion_decimal_1, ion_decimal_2;
 
     hWRITER writer = NULL;
     ION_STREAM *ion_stream = NULL;
     BYTE *result;
     SIZE result_len;
 
+    BOOL is_equal;
+
     ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
-    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
-    ION_ASSERT_OK(ion_reader_close(reader));
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_1));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_2));
+
+    ION_ASSERT_OK(ion_decimal_equals(&ion_decimal_1, &ion_decimal_2, &g_TestDecimalContext, &is_equal));
+    ASSERT_TRUE(is_equal);
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
-    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal_1));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal_2));
     ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
 
+    ION_ASSERT_OK(ion_reader_close(reader));
     ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
                                                 << std::string((char *)result, result_len);
-    ASSERT_STREQ(text_decimal, (char *)result);
+    assertStringsEqual(text_decimal, (char *)result, result_len);
+    free(result); // TODO wherever ion_test_writer_get_bytes is used, the result needs to be freed.
 }

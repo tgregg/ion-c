@@ -1069,7 +1069,7 @@ iERR _ion_timestamp_equals_helper(const ION_TIMESTAMP *ptime1, const ION_TIMESTA
         // Fractional precision does not matter in this case. Trim any trailing zeros from the fractions, then compare.
         decQuadReduce(&fraction_trimmed1, &ptime1->fraction, pcontext);
         decQuadReduce(&fraction_trimmed2, &ptime2->fraction, pcontext);
-        ion_decimal_equals(&fraction_trimmed1, &fraction_trimmed2, pcontext, &decResult);
+        ion_decimal_equals_quad(&fraction_trimmed1, &fraction_trimmed2, pcontext, &decResult);
         if (!decResult) goto is_false;
         IONCHECK(_ion_timestamp_initialize(&ptime1_compare));
         IONCHECK(_ion_timestamp_initialize(&ptime2_compare));
@@ -1127,7 +1127,7 @@ iERR _ion_timestamp_equals_helper(const ION_TIMESTAMP *ptime1, const ION_TIMESTA
             goto is_false;
         }
         if (precision1 == ION_TS_FRAC) { // Then precision2 is also ION_TS_FRAC.
-            ion_decimal_equals(&ptime1->fraction, &ptime2->fraction, pcontext, &decResult);
+            ion_decimal_equals_quad(&ptime1->fraction, &ptime2->fraction, pcontext, &decResult);
             if (!decResult) goto is_false;
         }
     }

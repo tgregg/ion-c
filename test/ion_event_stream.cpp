@@ -70,6 +70,9 @@ IonEventStream::~IonEventStream() {
                     case tid_INT_INT:
                         ion_int_free((ION_INT *)event->value);
                         break;
+                    case tid_DECIMAL_INT:
+                        ion_decimal_release((ION_DECIMAL *)event->value);
+                        break;
                     case tid_SYMBOL_INT:
                     case tid_STRING_INT:
                     case tid_CLOB_INT:
@@ -205,8 +208,9 @@ iERR read_next_value(hREADER hreader, IonEventStream *stream, ION_TYPE t, BOOL i
         }
         case tid_DECIMAL_INT:
         {
-            decQuad *decimal_value = (decQuad *)malloc(sizeof(decQuad));
-            IONCHECKORFREE(ion_reader_read_decimal(hreader, decimal_value), decimal_value);
+            ION_DECIMAL *decimal_value = (ION_DECIMAL *)malloc(sizeof(ION_DECIMAL));
+            IONCHECKORFREE(ion_reader_read_ion_decimal(hreader, decimal_value), decimal_value);
+            IONCHECKORFREE(ion_decimal_claim(decimal_value), decimal_value);
             event->value = decimal_value;
             break;
         }
@@ -375,7 +379,7 @@ iERR write_scalar(hWRITER writer, IonEvent *event) {
             IONCHECK(ion_writer_write_double(writer, *(double *)event->value));
             break;
         case tid_DECIMAL_INT:
-            IONCHECK(ion_writer_write_decimal(writer, (decQuad *)event->value));
+            IONCHECK(ion_writer_write_ion_decimal(writer, (ION_DECIMAL *)event->value));
             break;
         case tid_TIMESTAMP_INT:
             IONCHECK(ion_writer_write_timestamp(writer, (ION_TIMESTAMP *)event->value));

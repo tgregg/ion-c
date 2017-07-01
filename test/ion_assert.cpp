@@ -17,13 +17,13 @@
 TIMESTAMP_COMPARISON_FN g_TimestampEquals = ion_timestamp_equals;
 std::string g_CurrentTest = "NONE";
 decContext g_TestDecimalContext = {
-    100,                // max digits (arbitrarily high -- raise if test data requires more)
-    DEC_MAX_MATH,       // max exponent
-    -DEC_MAX_MATH,      // min exponent
-    DEC_ROUND_HALF_EVEN,// rounding mode
-    DEC_Errors,         // trap conditions
-    0,                  // status flags
-    0                   // apply exponent clamp?
+    ION_TEST_DECIMAL_MAX_DIGITS,    // max digits (arbitrarily high -- raise if test data requires more)
+    DEC_MAX_MATH,                   // max exponent
+    -DEC_MAX_MATH,                  // min exponent
+    DEC_ROUND_HALF_EVEN,            // rounding mode
+    DEC_Errors,                     // trap conditions
+    0,                              // status flags
+    0                               // apply exponent clamp?
 };
 
 char *ionIntToString(ION_INT *value) {
@@ -88,16 +88,16 @@ char *ionStringToString(ION_STRING *value) {
     return result;
 }
 
-::testing::AssertionResult assertIonDecimalEq(decQuad *expected, decQuad *actual) {
+::testing::AssertionResult assertIonDecimalEq(ION_DECIMAL *expected, ION_DECIMAL *actual) {
     BOOL decimal_equals;
-    EXPECT_EQ(IERR_OK, ion_decimal_equals(expected, actual, &g_TestDecimalContext, &decimal_equals));
+    ION_EXPECT_OK(ion_decimal_equals(expected, actual, &g_TestDecimalContext, &decimal_equals));
     if (decimal_equals) {
         return ::testing::AssertionSuccess();
     }
-    char expected_str[DECQUAD_String];
-    char actual_str[DECQUAD_String];
-    decQuadToString(expected, expected_str);
-    decQuadToString(actual, actual_str);
+    char expected_str[ION_TEST_DECIMAL_MAX_STRLEN];
+    char actual_str[ION_TEST_DECIMAL_MAX_STRLEN];
+    ION_EXPECT_OK(ion_decimal_to_string(expected, expected_str));
+    ION_EXPECT_OK(ion_decimal_to_string(actual, actual_str));
     return ::testing::AssertionFailure()
             << std::string("") << expected_str << " vs. " << actual_str;
 }
@@ -141,7 +141,7 @@ BOOL assertIonScalarEq(IonEvent *expected, IonEvent *actual, ASSERTION_TYPE asse
             ION_EXPECT_DOUBLE_EQ(*(double *) expected_value, *(double *) actual_value);
             break;
         case tid_DECIMAL_INT:
-            ION_EXPECT_DECIMAL_EQ((decQuad *) expected_value, (decQuad *) actual_value);
+            ION_EXPECT_DECIMAL_EQ((ION_DECIMAL *) expected_value, (ION_DECIMAL *) actual_value);
             break;
         case tid_TIMESTAMP_INT:
             ION_EXPECT_TIMESTAMP_EQ((ION_TIMESTAMP *) expected_value, (ION_TIMESTAMP *) actual_value);

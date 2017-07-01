@@ -17,8 +17,6 @@
 
 #include "ion.h"
 
-#define ION_ASSERT_OK(x) ASSERT_EQ(IERR_OK, x)
-
 /**
  * Initializes the given writer options to the test defaults, which provide
  * arbitrarily high limits.

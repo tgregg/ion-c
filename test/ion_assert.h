@@ -20,11 +20,17 @@
 #include "ion.h"
 #include "ion_event_stream.h"
 
+#define ION_TEST_DECIMAL_MAX_DIGITS 10000
+#define ION_TEST_DECIMAL_MAX_STRLEN (ION_TEST_DECIMAL_MAX_DIGITS + 14) // 14 extra bytes as specified by decNumber.
+
 #define ION_ENTER_ASSERTIONS /* nothing */
 
 #define ION_EXIT_ASSERTIONS return TRUE
 
 #define ION_ACCUMULATE_ASSERTION(x) if (!(x)) return FALSE;
+
+#define ION_ASSERT_OK(x) ASSERT_EQ(IERR_OK, x)
+#define ION_EXPECT_OK(x) EXPECT_EQ(IERR_OK, x)
 
 #define ION_ASSERT(x, m) { \
     if (!(x)) { \
@@ -223,7 +229,7 @@ char *ionStringToString(ION_STRING *value);
 
 ::testing::AssertionResult assertIonStringEq(ION_STRING *expected, ION_STRING *actual);
 ::testing::AssertionResult assertIonIntEq(ION_INT *expected, ION_INT *actual);
-::testing::AssertionResult assertIonDecimalEq(decQuad *expected, decQuad *actual);
+::testing::AssertionResult assertIonDecimalEq(ION_DECIMAL *expected, ION_DECIMAL *actual);
 
 /**
  * Asserts that the given timestamps are equal. Uses g_TimestampEquals as the comparison method.

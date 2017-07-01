@@ -374,7 +374,7 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_after));
-    ION_ASSERT_OK(ion_decimal_equals_iondec(&ion_decimal_before, &ion_decimal_after, &((ION_READER *)reader)->_deccontext, &equals));
+    ION_ASSERT_OK(ion_decimal_equals(&ion_decimal_before, &ion_decimal_after, &((ION_READER *)reader)->_deccontext, &equals));
     ION_ASSERT_OK(ion_reader_close(reader));
 
     ASSERT_TRUE(equals);

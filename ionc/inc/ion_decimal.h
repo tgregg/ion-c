@@ -55,13 +55,45 @@ ION_API_EXPORT iERR ion_decimal_set_to_double_value(decQuad *dec, double value, 
 ION_API_EXPORT iERR ion_decimal_get_double_value   (decQuad *dec, double *p_value);
 
 /**
+ * If necessary, copies the given decimal's internal data so that owner of that data may be closed. This is useful,
+ * for example, when it is necessary to keep the value in scope after the reader that produced it is closed. Once this
+ * function has been called on a value, `ion_decimal_release` must be called on the same value to free the copied
+ * memory.
+ *
+ * NOTE: this function should not be called on values that do not need to remain in scope after the reader is closed;
+ * doing so may force an unnecessary copy.
+ *
+ * @param value - The value to claim.
+ */
+ION_API_EXPORT iERR ion_decimal_claim(ION_DECIMAL *value);
+
+/**
+ * Frees any memory that was allocated during the corresponding call to `ion_decimal_claim` on this value.
+ *
+ * NOTE: it is an error to call this function on a value that has not been claimed; values that haven't been claimed do
+ * not need to be released manually.
+ *
+ * @param value - The value to release.
+ */
+ION_API_EXPORT iERR ion_decimal_release(ION_DECIMAL *value);
+
+/**
  * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
  * equivalent for the normalized values (even for zero).
  */
-// TODO get rid of this in favor of JUST the ION_DECIMAL version
-ION_API_EXPORT iERR ion_decimal_equals(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
-// TODO rename to ion_decimal_equals
-ION_API_EXPORT iERR ion_decimal_equals_iondec(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal);
+ION_API_EXPORT iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
+
+/**
+ * Compares ION_DECIMALs for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
+ * equivalent for the normalized values (even for zero).
+ */
+ION_API_EXPORT iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal);
+
+/**
+ * Converts the given ION_DECIMAL to a string. If the value has N decimal digits, the given string must have at least
+ * N + 14 available bytes.
+ */
+ION_API_EXPORT iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string);
 
 #ifdef __cplusplus
 }

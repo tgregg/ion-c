@@ -395,6 +395,7 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
     iENTER;
     ION_INT mantissa;
     SIZE decimal_digits;
+    uint32_t saved_status;
 
     ASSERT(p_quad);
 
@@ -412,7 +413,15 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
     else {
         // TODO the decimal's owner should really be the reader, not the stream... that requires a refactor.
         IONCHECK(_ion_decimal_number_alloc(pstream, decimal_digits, p_num));
+        saved_status = decContextSaveStatus(context, DEC_Inexact);
+        decContextClearStatus(context, DEC_Inexact);
         IONCHECK(ion_int_to_decimal_number(&mantissa, *p_num, context));
+        if (decContextTestStatus(context, DEC_Inexact)) {
+            // TODO test this error case
+            // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
+            FAILWITH(IERR_NUMERIC_OVERFLOW);
+        }
+        decContextRestoreStatus(context, saved_status, DEC_Inexact);
         (*p_num)->exponent = exponent;
     }
     iRETURN;

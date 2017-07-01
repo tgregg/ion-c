@@ -590,6 +590,9 @@ iERR _ion_writer_text_write_decimal_number(ION_WRITER *pwriter, decNumber *value
     }
     else {
         image = ion_alloc_with_owner(pwriter, value->digits + 14); // +14 is specified by decNumberToString.
+        if (!image) {
+            FAILWITH(IERR_NO_MEMORY);
+        }
         start = decNumberToString(value, image);
         exp = strchr(image, 'E');
         dec = strchr(image, '.');
