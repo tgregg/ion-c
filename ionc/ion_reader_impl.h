@@ -226,7 +226,6 @@ iERR _ion_reader_read_ion_int_helper(ION_READER *preader, ION_INT *p_value);
 iERR _ion_reader_read_mixed_int_helper(ION_READER *preader);
 iERR _ion_reader_read_double_helper(ION_READER *preader, double *p_value);
 iERR _ion_reader_read_decimal_helper(ION_READER *preader, decQuad *p_value);
-iERR _ion_reader_read_decimal_big_helper(ION_READER *preader, decNumber *p_value);
 iERR _ion_reader_read_ion_decimal_helper(ION_READER *preader, ION_DECIMAL *p_value);
 iERR _ion_reader_read_timestamp_helper(ION_READER *preader, ION_TIMESTAMP *p_value);
 iERR _ion_reader_read_symbol_sid_helper(ION_READER *preader, SID *p_value);

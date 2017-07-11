@@ -399,16 +399,17 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
 
     ASSERT(p_quad);
 
-    IONCHECK(ion_int_init(&mantissa, NULL));
+    IONCHECK(ion_int_init(&mantissa, pstream));
     IONCHECK(ion_binary_read_ion_int_signed(pstream, len, &mantissa));
     decimal_digits = DECIMAL_DIGIT_COUNT_FROM_BITS(_ion_int_highest_bit_set_helper(&mantissa));
-    // If the decimals components lay outside of the context bounds, it won't even fit into a decNumber, so might as
-    // well put it in a decQuad. If the components will fit in a decQuad, do it. Otherwise, use a decNumber.
-    if (!p_num || decimal_digits > context->digits || exponent > context->emax || exponent < context->emin
-        || (decimal_digits <= DECQUAD_Pmax && exponent <= DECQUAD_Emax && exponent >= DECQUAD_Emin))
-    {
+    if (decimal_digits <= DECQUAD_Pmax && exponent <= DECQUAD_Emax && exponent >= DECQUAD_Emin) {
         IONCHECK(ion_int_to_decimal(&mantissa, p_quad, context));
         decQuadSetExponent(p_quad, context, exponent);
+    }
+    else if (!p_num) {
+        // The decimal's components lay outside of decQuad bounds and a decNumber was not provided. Rather than silently
+        // losing precision, fail.
+        FAILWITH(IERR_NUMERIC_OVERFLOW);
     }
     else {
         // TODO the decimal's owner should really be the reader, not the stream... that requires a refactor.
@@ -417,7 +418,6 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
         decContextClearStatus(context, DEC_Inexact);
         IONCHECK(ion_int_to_decimal_number(&mantissa, *p_num, context));
         if (decContextTestStatus(context, DEC_Inexact)) {
-            // TODO test this error case
             // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
             FAILWITH(IERR_NUMERIC_OVERFLOW);
         }
@@ -460,7 +460,7 @@ iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *conte
     isNegative = FALSE;
     if (value_len == 0) {
         mantissa = 0;
-        ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_quad);
+        IONCHECK(ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_quad));
     }
     else {
         if (value_len <= sizeof(uint64_t)) {
@@ -470,7 +470,7 @@ iERR ion_binary_read_decimal(ION_STREAM *pstream, int32_t len, decContext *conte
             // magnitude. Although this exact case could be checked, it is probably not worth the extra complexity given
             // that most decimals likely do not fall in that range.
             IONCHECK(ion_binary_read_int_64_and_sign(pstream, (int32_t)value_len, &mantissa, &isNegative));
-            ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_quad);
+            IONCHECK(ion_quad_get_quad_from_digits_and_exponent(mantissa, exponent, context, isNegative, p_quad));
         }
         else {
             IONCHECK(_ion_binary_read_decimal_helper(pstream, (int32_t) value_len, exponent, context, p_quad, p_num));

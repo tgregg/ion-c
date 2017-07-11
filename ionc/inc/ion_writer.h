@@ -95,6 +95,8 @@ typedef struct _ion_writer_options
      *
      * If NULL, the writer will initialize its decimal context by calling decContextDefault with the DEC_INIT_DECQUAD
      * option, which results in a maximum of 34 decimal digits and an exponent range of [-6143, 6144].
+     *
+     * Note that up to 34 digits of precision will always be supported, even if configured to be less than 34.
      */
     decContext *decimal_context;
 

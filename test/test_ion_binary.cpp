@@ -361,7 +361,6 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_before));
-    ION_ASSERT_OK(ion_reader_close(reader));
     // Make sure we start with a full-fidelity decimal, otherwise the test would incorrectly succeed.
     ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal_before.type);
     ASSERT_EQ(53, ion_decimal_before.value.num_value->digits);
@@ -370,6 +369,7 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal_before));
     ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
 
+    ION_ASSERT_OK(ion_reader_close(reader));
     ION_ASSERT_OK(ion_test_new_reader(result, (SIZE)result_len, &reader));
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
@@ -378,4 +378,167 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ION_ASSERT_OK(ion_reader_close(reader));
 
     ASSERT_TRUE(equals);
+    free(result);
+}
+
+TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
+    // This test asserts that an error is raised when decimal precision would be lost. From the
+    // `ion_reader_read_ion_decimal` API, this only occurs when the input has more digits of precision than would fit in
+    // a decQuad , and the precision exceeds the context's max digits.
+    decContext context = {
+            DECQUAD_Pmax,                   // max digits
+            DEC_MAX_MATH,                   // max exponent
+            -DEC_MAX_MATH,                  // min exponent
+            DEC_ROUND_HALF_EVEN,            // rounding mode
+            DEC_Errors,                     // trap conditions
+            0,                              // status flags
+            0                               // apply exponent clamp?
+    };
+    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
+    hREADER reader;
+    ION_READER_OPTIONS options;
+    ION_TYPE type;
+    ION_DECIMAL ion_decimal;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    // This reader supports arbitrarily-high decimal precision.
+    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal.type);
+    ASSERT_EQ(53, ion_decimal.value.num_value->digits);
+
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ION_ASSERT_OK(ion_reader_close(reader));
+    ion_test_initialize_reader_options(&options);
+    options.decimal_context = &context;
+    // This reader only supports decQuad precision, which the input exceeds.
+    ION_ASSERT_OK(ion_reader_open_buffer(&reader, (BYTE *)result, result_len, &options));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ASSERT_EQ(IERR_NUMERIC_OVERFLOW, ion_reader_read_ion_decimal(reader, &ion_decimal));
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+    free(result);
+}
+
+TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
+    // This test asserts that an error is raised when decimal precision would be lost. From the
+    // `ion_reader_read_decimal` API, This always occurs when the input has more digits of precision than would fit in a
+    // decQuad.
+    decContext context = {
+            DECQUAD_Pmax,                   // max digits
+            DEC_MAX_MATH,                   // max exponent
+            -DEC_MAX_MATH,                  // min exponent
+            DEC_ROUND_HALF_EVEN,            // rounding mode
+            DEC_Errors,                     // trap conditions
+            0,                              // status flags
+            0                               // apply exponent clamp?
+    };
+    const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
+    hREADER reader;
+    ION_READER_OPTIONS options;
+    ION_TYPE type;
+    ION_DECIMAL ion_decimal;
+    decQuad quad;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    // This reader supports arbitrarily-high decimal precision.
+    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal.type);
+    ASSERT_EQ(53, ion_decimal.value.num_value->digits);
+
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ION_ASSERT_OK(ion_reader_close(reader));
+    ion_test_initialize_reader_options(&options);
+    options.decimal_context = &context;
+    // This reader only supports decQuad precision, which the input exceeds.
+    ION_ASSERT_OK(ion_reader_open_buffer(&reader, (BYTE *)result, result_len, &options));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ASSERT_EQ(IERR_NUMERIC_OVERFLOW, ion_reader_read_decimal(reader, &quad));
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+    free(result);
+}
+
+TEST(IonBinaryDecimal, ReaderAlwaysPreservesUpTo34Digits) {
+    // Because decQuads are statically sized, decimals with <= DECQUAD_Pmax digits of precision never need to overflow;
+    // they ca always be accommodated in a decQuad. This test asserts that precision is preserved even when the context
+    // is configured with fewer digits than DECQUAD_Pmax.
+    decContext context = {
+            3,                              // max digits
+            DEC_MAX_MATH,                   // max exponent
+            -DEC_MAX_MATH,                  // min exponent
+            DEC_ROUND_HALF_EVEN,            // rounding mode
+            DEC_Errors,                     // trap conditions
+            0,                              // status flags
+            0                               // apply exponent clamp?
+    };
+    const char *text_decimal = "1.234\n5.678";
+    hREADER reader;
+    ION_READER_OPTIONS options;
+    ION_TYPE type;
+    ION_DECIMAL ion_decimal_before, ion_decimal_after;
+    decQuad quad_before, quad_after;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    BOOL decimal_equals, quad_equals;
+
+    // This reader supports arbitrarily-high decimal precision.
+    ION_ASSERT_OK(ion_test_new_text_reader(text_decimal, &reader));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_before));
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, ion_decimal_before.type);
+    ASSERT_EQ(4, decQuadDigits(&ion_decimal_before.value.quad_value));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_decimal(reader, &quad_before));
+
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
+    ION_ASSERT_OK(ion_writer_write_ion_decimal(writer, &ion_decimal_before));
+    ION_ASSERT_OK(ion_writer_write_decimal(writer, &quad_before));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ion_test_initialize_reader_options(&options);
+    options.decimal_context = &context;
+    ION_ASSERT_OK(ion_reader_open_buffer(&reader, (BYTE *)text_decimal, strlen(text_decimal), &options));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_after));
+    ION_ASSERT_OK(ion_reader_next(reader, &type));
+    ASSERT_EQ(tid_DECIMAL, type);
+    ION_ASSERT_OK(ion_reader_read_decimal(reader, &quad_after));
+
+    ION_ASSERT_OK(ion_decimal_equals(&ion_decimal_before, &ion_decimal_after, &((ION_READER *)reader)->_deccontext, &decimal_equals));
+    ION_ASSERT_OK(ion_decimal_equals_quad(&quad_before, &quad_after, &((ION_READER *)reader)->_deccontext, &quad_equals));
+
+    ION_ASSERT_OK(ion_reader_close(reader));
+
+    ASSERT_TRUE(decimal_equals);
+    ASSERT_TRUE(quad_equals);
+    free(result);
 }

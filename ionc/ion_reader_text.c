@@ -1605,13 +1605,18 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumb
     saved_status = decContextSaveStatus(&preader->_deccontext, DEC_Inexact);
     decContextClearStatus(&preader->_deccontext, DEC_Inexact);
     decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
-    if (p_num && decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
-        decContextClearStatus(&preader->_deccontext, DEC_Inexact);
-        IONCHECK(_ion_decimal_number_alloc(preader, decimal_digits, p_num));
-        decNumberFromString(*p_num, text->_scanner._value_image.value, &preader->_deccontext);
-        if (decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
-            // TODO test this error case
-            // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
+    if (decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
+        if (p_num) {
+            decContextClearStatus(&preader->_deccontext, DEC_Inexact);
+            IONCHECK(_ion_decimal_number_alloc(preader, decimal_digits, p_num));
+            decNumberFromString(*p_num, text->_scanner._value_image.value, &preader->_deccontext);
+            if (decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
+                // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
+                FAILWITH(IERR_NUMERIC_OVERFLOW);
+            }
+        }
+        else {
+            // The value is too large to fit in a decQuad. Rather than silently losing precision, fail.
             FAILWITH(IERR_NUMERIC_OVERFLOW);
         }
     }

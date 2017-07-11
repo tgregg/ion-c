@@ -665,10 +665,10 @@ iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value, decContext *con
         is_zero = decQuadIsZero(&temp1);
         if (is_zero) break; // so I can see this in a debugger
 
-        decQuadRemainder(&temp2, &temp1, &g_digit_base, context);
+        decQuadRemainder(&temp2, &temp1, &g_digit_base_quad, context);
         digit = decQuadToUInt32(&temp2, context, DEC_ROUND_DOWN);
         iint->_digits[digit_idx] = digit;
-        decQuadDivideInteger(&temp1, &temp1, &g_digit_base, context);
+        decQuadDivideInteger(&temp1, &temp1, &g_digit_base_quad, context);
     }
 
     // we don't have to zero the digits because we did during allocation
@@ -678,7 +678,7 @@ iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value, decContext *con
     iRETURN;
 }
 
-iERR ion_int_from_decimal_big(ION_INT *iint, const decNumber *p_value, decContext *context)
+iERR ion_int_from_decimal_number(ION_INT *iint, const decNumber *p_value, decContext *context)
 {
     iENTER;
     BOOL     is_neg;
@@ -964,7 +964,7 @@ iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad, decContext *context)
     while (digits < end) {
         digit = *digits++;
         decQuadFromInt32(&quad_digit, (int32_t)digit);
-        decQuadFMA(p_quad, p_quad, &g_digit_base, &quad_digit, context);
+        decQuadFMA(p_quad, p_quad, &g_digit_base_quad, &quad_digit, context);
     }
 
     if (iint->_signum == -1) {
@@ -997,7 +997,7 @@ iERR ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *co
     while (digits < end) {
         digit = *digits++;
         decNumberFromInt32(dec_digit, (int32_t)digit);
-        decNumberFMA(p_value, p_value, g_digit_base_big, dec_digit, context);
+        decNumberFMA(p_value, p_value, g_digit_base_number, dec_digit, context);
     }
 
     if (iint->_signum == -1) {
@@ -1032,9 +1032,9 @@ int _ion_int_init_globals_helper()
     // invariant needed for multiply and add
     ASSERT((UINT64_MAX) >= ( (((II_LONG_DIGIT)II_MAX_DIGIT) * ((II_LONG_DIGIT)II_MAX_DIGIT)) + (((II_LONG_DIGIT)II_MAX_DIGIT)*2) ));
 
-    decQuadFromUInt32(&g_digit_base, II_BASE);
-    g_digit_base_big = (decNumber *)gDigitBaseBigBuffer;
-    decNumberFromUInt32(g_digit_base_big, II_BASE);
+    decQuadFromUInt32(&g_digit_base_quad, II_BASE);
+    g_digit_base_number = (decNumber *)gDigitBaseBigBuffer;
+    decNumberFromUInt32(g_digit_base_number, II_BASE);
 
     return 0;
 }

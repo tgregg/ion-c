@@ -65,18 +65,23 @@ void ion_quad_get_exponent_and_shift(const decQuad *quad_value, decContext *set,
     }
 }
 
-void ion_quad_get_quad_from_digits_and_exponent(uint64_t value, int32_t exp,
+iERR ion_quad_get_quad_from_digits_and_exponent(uint64_t value, int32_t exp,
         decContext *set, BOOL is_negative, decQuad *p_quad)
 {
+    iENTER;
     decQuad result, nine_quad_digits;
     decQuad multiplier;
     int32_t nine_digits;
     int     multiplier_exponent;
+    uint32_t saved_status;
 
     // decDoubleScaleB(r, x, y, set) - This calculates x * 10y and places
     //                                 the result in r.
 
     decQuadZero(&result);
+
+    saved_status = decContextSaveStatus(set, DEC_Inexact);
+    decContextClearStatus(set, DEC_Inexact);
 
     decQuadFromInt32(&multiplier, 1);
     multiplier_exponent = 0;
@@ -105,9 +110,15 @@ void ion_quad_get_quad_from_digits_and_exponent(uint64_t value, int32_t exp,
     }
     decQuadSetExponent(&result, set, exp);
 
+    if (decContextTestStatus(set, DEC_Inexact)) {
+        // The value is too large to fit in a decQuad representation. Rather than silently losing precision, fail.
+        FAILWITH(IERR_NUMERIC_OVERFLOW);
+    }
+    decContextRestoreStatus(set, saved_status, DEC_Inexact);
+
     decQuadCopy(p_quad, &result);
 
-    return;
+    iRETURN;
 }
 
 void ion_quad_get_packed_and_exponent_from_quad(const decQuad *quad_value, uint8_t *p_packed, int32_t *p_exp)
