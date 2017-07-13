@@ -58,8 +58,26 @@ TEST(IonDecimal, FMADecQuad) {
     std::cout << expected_str << std::endl;
      */
 }
-
 TEST(IonDecimal, FMADecNumber) {
+    ION_DECIMAL result1, result2, lhs, rhs, fhs, expected;
+    // Because these decimals have more than DECQUAD_Pmax digits, they will be backed by decNumbers.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_string(&rhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_string(&fhs, "-100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_fma(&result1, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_fma_macro(&result2, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000000000100000000000000000000000000000000000000.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &result1));
+    ASSERT_TRUE(assertIonDecimalEq(&result1, &result2));
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+    ION_ASSERT_OK(ion_decimal_release(&rhs));
+    ION_ASSERT_OK(ion_decimal_release(&fhs));
+    ION_ASSERT_OK(ion_decimal_release(&result1));
+    ION_ASSERT_OK(ion_decimal_release(&result2));
+}
+
+TEST(IonDecimal, FMAMixed) {
     ION_DECIMAL result1, result2, lhs, rhs, fhs, expected;
     // Because this decimal has more than DECQUAD_Pmax digits, it will be backed by a decNumber.
     ION_ASSERT_OK(ion_decimal_from_string(&lhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
@@ -103,6 +121,10 @@ TEST(IonDecimal, FMADecQuadOverflows) {
     ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result1));
     ASSERT_TRUE(assertIonDecimalEq(&result1, &result2));
+
+    // Asserts that the operation results in a decNumber.
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, result1.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, result2.type);
 
     // Asserts that the operation did not change the operands.
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
