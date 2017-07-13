@@ -986,6 +986,7 @@ iERR ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *co
     char dec_int32_buf[32];
     decNumber *dec_digit;
 
+    memset(dec_int32_buf, 0, 32);
     _ion_int_init_globals();
 
     IONCHECK(_ion_int_validate_non_null_arg_with_ptr(iint, p_value));

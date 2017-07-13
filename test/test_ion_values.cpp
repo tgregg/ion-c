@@ -39,3 +39,76 @@ TEST(IonTimestamp, IgnoresSuperfluousOffset) {
     ASSERT_TRUE(assertIonTimestampEq(&expected1, &actual));
     ASSERT_TRUE(assertIonTimestampEq(&expected2, &actual)); // Equivalence ignores the superfluous offset as well.
 }
+
+TEST(IonDecimal, FMADecQuad) {
+    ION_DECIMAL result1, result2, lhs, rhs, fhs, expected;
+    // The operands are all backed by decQuads.
+    ION_ASSERT_OK(ion_decimal_from_int32(&lhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    ION_ASSERT_OK(ion_decimal_fma(&result1, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_fma_macro(&result2, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_int32(&expected, 101));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &result1));
+    ASSERT_TRUE(assertIonDecimalEq(&result1, &result2));
+
+    /*
+    char expected_str[ION_TEST_DECIMAL_MAX_STRLEN];
+    ION_ASSERT_OK(ion_decimal_to_string(&result2, expected_str));
+    std::cout << expected_str << std::endl;
+     */
+}
+
+TEST(IonDecimal, FMADecNumber) {
+    ION_DECIMAL result1, result2, lhs, rhs, fhs, expected;
+    // Because this decimal has more than DECQUAD_Pmax digits, it will be backed by a decNumber.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    /*
+    char lhs_str[ION_TEST_DECIMAL_MAX_STRLEN];
+    ION_ASSERT_OK(ion_decimal_to_string(&lhs, lhs_str));
+    std::cout << lhs_str << std::endl;
+    */
+    // These operands are backed by decQuads. They will be temporarily converted to decNumbers to perform the calculation.
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    ION_ASSERT_OK(ion_decimal_fma(&result1, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_fma_macro(&result2, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "1000000000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &result1));
+    ASSERT_TRUE(assertIonDecimalEq(&result1, &result2));
+
+    /*
+    char expected_str[ION_TEST_DECIMAL_MAX_STRLEN];
+    ION_ASSERT_OK(ion_decimal_to_string(&result2, expected_str));
+    std::cout << expected_str << std::endl;
+    */
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+    ION_ASSERT_OK(ion_decimal_release(&result1));
+    ION_ASSERT_OK(ion_decimal_release(&result2));
+}
+
+TEST(IonDecimal, FMADecQuadOverflows) {
+    ION_DECIMAL result1, result2, lhs, rhs, fhs, expected;
+    // This decimal has exactly DECQUAD_Pmax digits, so it fits into a decQuad.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "1000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    // The operation will try to keep this in decQuads, but detects overflow and upgrades them to decNumbers.
+    ION_ASSERT_OK(ion_decimal_fma(&result1, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_fma_macro(&result2, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &result1));
+    ASSERT_TRUE(assertIonDecimalEq(&result1, &result2));
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&result1));
+    ION_ASSERT_OK(ion_decimal_release(&result2));
+}

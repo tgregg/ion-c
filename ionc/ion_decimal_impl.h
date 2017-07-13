@@ -17,11 +17,17 @@
 
 #include "ion_types.h"
 
+#ifndef DECNUMDIGITS
+    #undef DECNUMDIGITS
+#endif
+#define DECNUMDIGITS DECQUAD_Pmax
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_number);
+iERR _ion_decimal_from_string_helper(char *str, decContext *context, hOWNER owner, decQuad *p_quad, decNumber **p_num);
 
 #ifdef __cplusplus
 }

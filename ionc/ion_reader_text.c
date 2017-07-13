@@ -1566,9 +1566,6 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumb
 {
     iENTER;
     ION_TEXT_READER *text = &preader->typed_reader.text;
-    char            *cp, c_save = 0;
-    uint32_t        saved_status;
-    SIZE            decimal_digits = 0;
 
     ASSERT(preader);
     ASSERT(p_quad);
@@ -1587,44 +1584,8 @@ iERR _ion_reader_text_read_decimal(ION_READER *preader, decQuad *p_quad, decNumb
     ASSERT(text->_scanner._value_image.length > 0);
     ASSERT(text->_scanner._value_image.value[text->_scanner._value_image.length] == 0);
 
-    for (cp = text->_scanner._value_image.value; *cp; cp++) {
-        if (*cp == 'd' || *cp == 'D') {
-            c_save = *cp;
-            *cp = 'e';
-            break;
-        }
-        if (*cp != '.') {
-            decimal_digits++;
-        }
-    }
-    // replace the 'd' with a 'e' to make decQuadFromString happy (if there is a 'd')
-    if (*cp) {
-        c_save = *cp;
-        *cp = 'e';
-    }
-    saved_status = decContextSaveStatus(&preader->_deccontext, DEC_Inexact);
-    decContextClearStatus(&preader->_deccontext, DEC_Inexact);
-    decQuadFromString(p_quad, text->_scanner._value_image.value, &preader->_deccontext);
-    if (decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
-        if (p_num) {
-            decContextClearStatus(&preader->_deccontext, DEC_Inexact);
-            IONCHECK(_ion_decimal_number_alloc(preader, decimal_digits, p_num));
-            decNumberFromString(*p_num, text->_scanner._value_image.value, &preader->_deccontext);
-            if (decContextTestStatus(&preader->_deccontext, DEC_Inexact)) {
-                // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
-                FAILWITH(IERR_NUMERIC_OVERFLOW);
-            }
-        }
-        else {
-            // The value is too large to fit in a decQuad. Rather than silently losing precision, fail.
-            FAILWITH(IERR_NUMERIC_OVERFLOW);
-        }
-    }
-    decContextRestoreStatus(&preader->_deccontext, saved_status, DEC_Inexact);
-    // restore the string is we munged it, just in case someone else wants to use if later
-    if (*cp) {
-        *cp = c_save;
-    }
+    IONCHECK(_ion_decimal_from_string_helper((char *)text->_scanner._value_image.value, &preader->_deccontext,
+                                             preader, p_quad, p_num));
 
     iRETURN;
 }

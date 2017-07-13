@@ -344,7 +344,7 @@ TEST(IonBinarySymbol, ReaderReadsNullSymbol) {
     ION_ASSERT_OK(ion_reader_close(reader));
 }
 
-
+// TODO consolodate the decimal tests with the text versions in a centralized location?
 TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     const char *text_decimal = "1.1999999999999999555910790149937383830547332763671875";
     hREADER reader;
