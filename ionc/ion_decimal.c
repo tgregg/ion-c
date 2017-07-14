@@ -140,27 +140,6 @@ not_equal:
     iRETURN;
 }
 
-iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
-    iENTER;
-    ASSERT(is_equal);
-    if (left->type != right->type) {
-        // TODO support this, otherwise the user has to care what type backs his/her ION_DECIMAL.
-        *is_equal = FALSE;
-        SUCCEED();
-    }
-    switch (left->type) {
-        case ION_DECIMAL_TYPE_QUAD:
-            IONCHECK(ion_decimal_equals_quad(&left->value.quad_value, &right->value.quad_value, context, is_equal));
-            break;
-        case ION_DECIMAL_TYPE_NUMBER:
-            IONCHECK(_ion_decimal_equals_number(left->value.num_value, right->value.num_value, context, is_equal));
-            break;
-        default:
-            FAILWITH(IERR_INVALID_ARG);
-    }
-    iRETURN;
-}
-
 #define ION_DECIMAL_AS_QUAD(ion_decimal) &ion_decimal->value.quad_value
 #define ION_DECIMAL_AS_NUMBER(ion_decimal) ion_decimal->value.num_value
 
@@ -284,128 +263,10 @@ ION_DECIMAL_ELSE_IF_NUMBER(value) { \
 ION_DECIMAL_ENDIF; \
 iRETURN;
 
-#define ION_DECIMAL_CALCULATION_API(value, if_quad, if_overflow, if_number, context) \
-iENTER; \
-uint32_t saved_status; \
-ION_DECIMAL_IF_QUAD(value) { \
-    saved_status = decContextSaveStatus(context, DEC_Inexact); \
-    decContextClearStatus(context, DEC_Inexact); \
-    if_quad; \
-    value->type = ION_DECIMAL_TYPE_QUAD; \
-    if (decContextTestStatus(context, DEC_Inexact)) { /*IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, ION_DECIMAL_AS_NUMBER(value)));*/ /*decQuadToNumber(quad_value, ION_DECIMAL_AS_NUMBER(value));*/ \
-        if_overflow; \
-    } \
-    decContextRestoreStatus(context, saved_status, DEC_Inexact); \
-} \
-ION_DECIMAL_ELSE_IF_NUMBER(value) { \
-    if_number; \
-    value->type = ION_DECIMAL_TYPE_NUMBER; \
-} \
-ION_DECIMAL_ENDIF; \
-iRETURN;
-
 
 iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
     ION_DECIMAL_API(value, decQuadToString(quad_value, p_string), decNumberToString(num_value, p_string));
 }
-
-iERR _ion_decimal_fma_standardized(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context, int decnum_mask) {
-    iENTER;
-    BYTE operands_buffer[3 * ION_DECNUMBER_DECQUAD_SIZE];
-    size_t offset;
-    decNumber *op1, *op2, *op3;
-
-    memset(operands_buffer, 0, 3 * ION_DECNUMBER_DECQUAD_SIZE);
-    if ((decnum_mask & 1) == 0) {
-        offset = 0;
-        op1 = (decNumber *)(operands_buffer + offset);
-        decQuadToNumber(ION_DECIMAL_AS_QUAD(lhs), op1);
-    }
-    else {
-        ASSERT(ION_DECIMAL_TYPE_NUMBER == lhs->type);
-        op1 = lhs->value.num_value;
-    }
-    if ((decnum_mask & 2) == 0) {
-        offset = 1 * ION_DECNUMBER_DECQUAD_SIZE;
-        op2 = (decNumber *)(operands_buffer + offset); // This makes sure the num_value is active in the union.
-        decQuadToNumber(ION_DECIMAL_AS_QUAD(rhs), op2);
-    }
-    else {
-        ASSERT(ION_DECIMAL_TYPE_NUMBER == rhs->type);
-        op2 = rhs->value.num_value;
-    }
-    if ((decnum_mask & 4) == 0) {
-        offset = 2 * ION_DECNUMBER_DECQUAD_SIZE;
-        op3 = (decNumber *)(operands_buffer + offset); // This makes sure the num_value is active in the union.
-        decQuadToNumber(ION_DECIMAL_AS_QUAD(fhs), op3);
-    }
-    else {
-        ASSERT(ION_DECIMAL_TYPE_NUMBER == fhs->type);
-        op3 = fhs->value.num_value;
-    }
-
-    IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value)));
-    decNumberFMA(ION_DECIMAL_AS_NUMBER(value), op1, op2, op3, context);
-    value->type = ION_DECIMAL_TYPE_NUMBER;
-    iRETURN;
-}
-/*
-iERR _ion_decimal_fma_helper(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context, int decnum_mask) {
-    ION_DECIMAL_CALCULATION_API(value, decQuadFMA(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context),
-                                IONCHECK(_ion_decimal_fma_standardized(value, lhs, rhs, fhs, context, decnum_mask)),
-                                decNumberFMA(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context), context);
-}
-*/
-iERR ion_decimal_fma(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context) {
-    iENTER;
-    uint32_t saved_status; \
-    int num_decnums =   (lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0)
-                      | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0)
-                      | (fhs->type == ION_DECIMAL_TYPE_NUMBER ? 4 : 0);
-    if (num_decnums > 0 && num_decnums < 7) {
-
-        // All operands must have the same type. Convert all non-decNumbers to decNumbers.
-        IONCHECK(_ion_decimal_fma_standardized(value, lhs, rhs, fhs, context, num_decnums));
-    }
-    else {
-        value->type = (num_decnums == 0) ? ION_DECIMAL_TYPE_QUAD : ION_DECIMAL_TYPE_NUMBER;
-        ION_DECIMAL_IF_QUAD(value) { \
-            saved_status = decContextSaveStatus(context, DEC_Inexact);
-            decContextClearStatus(context, DEC_Inexact);
-            decQuadFMA(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context);
-            value->type = ION_DECIMAL_TYPE_QUAD;
-            if (decContextTestStatus(context, DEC_Inexact)) {
-                IONCHECK(_ion_decimal_fma_standardized(value, lhs, rhs, fhs, context, num_decnums));
-            }
-            decContextRestoreStatus(context, saved_status, DEC_Inexact);
-        }
-        ION_DECIMAL_ELSE_IF_NUMBER(value) {
-            IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value)));
-            decNumberFMA(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context);
-            value->type = ION_DECIMAL_TYPE_NUMBER;
-        }
-        ION_DECIMAL_ENDIF;
-    }
-    iRETURN;
-}
-
-#define ION_DECIMAL_OVERFLOW_API_HELPER(value, if_quad, if_overflow, if_number, context) \
-uint32_t saved_status; \
-ION_DECIMAL_IF_QUAD(value) { \
-    saved_status = decContextSaveStatus(context, DEC_Inexact); \
-    decContextClearStatus(context, DEC_Inexact); \
-    if_quad(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context); \
-    value->type = ION_DECIMAL_TYPE_QUAD; \
-    if (decContextTestStatus(context, DEC_Inexact)) { /*IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, ION_DECIMAL_AS_NUMBER(value)));*/ /*decQuadToNumber(quad_value, ION_DECIMAL_AS_NUMBER(value));*/ \
-        IONCHECK(if_overflow(value, lhs, rhs, fhs, context, decnum_mask)); \
-    } \
-    decContextRestoreStatus(context, saved_status, DEC_Inexact); \
-} \
-ION_DECIMAL_ELSE_IF_NUMBER(value) { \
-    if_number(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context); \
-    value->type = ION_DECIMAL_TYPE_NUMBER; \
-} \
-ION_DECIMAL_ENDIF; \
 
 #define ION_DECIMAL_QUAD_TO_NUM(dec, dn, ord) \
     if ((decnum_mask & (1 << ord)) == 0) { \
@@ -418,36 +279,45 @@ ION_DECIMAL_ENDIF; \
         dn = dec->value.num_value; \
     } \
 
-#define ION_DECIMAL_OVERFLOW_API_THREE_OPERAND(name, if_quad, if_number) \
-iERR _##name##_standardized(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context, int decnum_mask) { \
-    iENTER; \
+#define ION_DECIMAL_CONVERT_THREE_OPERAND \
     BYTE operands_buffer[3 * ION_DECNUMBER_DECQUAD_SIZE]; \
     size_t offset; \
     decNumber *op1, *op2, *op3; \
     memset(operands_buffer, 0, 3 * ION_DECNUMBER_DECQUAD_SIZE); \
     ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
     ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1); \
-    ION_DECIMAL_QUAD_TO_NUM(fhs, op3, 2); \
+    ION_DECIMAL_QUAD_TO_NUM(fhs, op3, 2);
+
+#define ION_DECIMAL_CONVERT_TWO_OPERAND \
+    BYTE operands_buffer[2 * ION_DECNUMBER_DECQUAD_SIZE]; \
+    size_t offset; \
+    decNumber *op1, *op2; \
+    memset(operands_buffer, 0, 2 * ION_DECNUMBER_DECQUAD_SIZE); \
+    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
+    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1); \
+
+#define ION_DECIMAL_OVERFLOW_API_BUILDER(name, num_ops, api_args, if_quad, if_quad_args, decnum_mask_calc, if_number, if_number_args, helper_args, convert_ops, converted_args, standardized_args) \
+iERR _##name##_standardized helper_args { \
+    iENTER; \
+    convert_ops; \
     IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value))); \
-    if_number(ION_DECIMAL_AS_NUMBER(value), op1, op2, op3, context); \
+    if_number converted_args; \
     value->type = ION_DECIMAL_TYPE_NUMBER; \
     iRETURN; \
 } \
-iERR name(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context) { \
+iERR name api_args { \
     iENTER; \
     uint32_t status; \
-    int decnum_mask =     (lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) \
-                        | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0) \
-                        | (fhs->type == ION_DECIMAL_TYPE_NUMBER ? 4 : 0); \
-    if (decnum_mask > 0 && decnum_mask < 7) { \
+    int decnum_mask = decnum_mask_calc; \
+    if (decnum_mask > 0 && decnum_mask < ((1 << num_ops) - 1)) { \
         /* Not all operands have the same type. Convert all non-decNumbers to decNumbers. */ \
-        IONCHECK(_##name##_standardized(value, lhs, rhs, fhs, context, decnum_mask)); \
+        IONCHECK(_##name##_standardized standardized_args); \
     } \
     else if (decnum_mask){ \
-        ASSERT(decnum_mask == 7); \
+        ASSERT(decnum_mask == ((1 << num_ops) - 1)); \
         /* All operands are decNumbers. */ \
         IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value))); \
-        if_number(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context); \
+        if_number if_number_args; \
         value->type = ION_DECIMAL_TYPE_NUMBER; \
     } \
     else { \
@@ -455,11 +325,11 @@ iERR name(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, co
         /* All operands are decQuads. */ \
         status = decContextSaveStatus(context, DEC_Inexact); \
         decContextClearStatus(context, DEC_Inexact); \
-        if_quad(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context); \
+        if_quad if_quad_args; \
         value->type = ION_DECIMAL_TYPE_QUAD; \
         if (decContextTestStatus(context, DEC_Inexact)) { \
             /* The operation overflowed the maximum decQuad precision. Convert operands and result to decNumbers. */ \
-            IONCHECK(_##name##_standardized(value, lhs, rhs, fhs, context, decnum_mask)); \
+            IONCHECK(_##name##_standardized standardized_args); \
         } \
         decContextRestoreStatus(context, status, DEC_Inexact); \
     } \
@@ -467,62 +337,64 @@ iERR name(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, co
 }
 
 #define ION_DECIMAL_CALC_THREE_OP(name, if_quad, if_number) \
-    if_number(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context); \
-    if_quad(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context); \
-    { \
-        ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
-        ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1); \
-        ION_DECIMAL_QUAD_TO_NUM(fhs, op3, 2); \
-    } \
-    if_number(ION_DECIMAL_AS_NUMBER(value), op1, op2, op3, context); \
+    ION_DECIMAL_OVERFLOW_API_BUILDER ( \
+        name, \
+        /*num_ops=*/3, \
+        /*api_args=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context), \
+        if_quad, \
+        /*if_quad_args=*/(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context), \
+        /*decnum_mask_calc=*/ ((lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0) | (fhs->type == ION_DECIMAL_TYPE_NUMBER ? 4 : 0)), \
+        if_number, \
+        /*if_number_args=*/(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), ION_DECIMAL_AS_NUMBER(fhs), context), \
+        /*helper_args=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context, int decnum_mask), \
+        /*convert_ops=*/ION_DECIMAL_CONVERT_THREE_OPERAND, \
+        /*converted_args=*/(ION_DECIMAL_AS_NUMBER(value), op1, op2, op3, context), \
+        /*standardized_args=*/(value, lhs, rhs, fhs, context, decnum_mask) \
+    ) \
 
-ION_DECIMAL_OVERFLOW_API_THREE_OPERAND(ion_decimal_fma_macro, decQuadFMA, decNumberFMA);
+#define ION_DECIMAL_CALC_TWO_OP(name, if_quad, if_number) \
+    ION_DECIMAL_OVERFLOW_API_BUILDER ( \
+        name, \
+        /*num_ops=*/2, \
+        /*api_args=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context), \
+        if_quad, \
+        /*if_quad_args=*/(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), context), \
+        /*decnum_mask_calc=*/ ((lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0)), \
+        if_number, \
+        /*if_number_args=*/(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), context), \
+        /*helper_args=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, int decnum_mask), \
+        /*convert_ops=*/ION_DECIMAL_CONVERT_TWO_OPERAND, \
+        /*converted_args=*/(ION_DECIMAL_AS_NUMBER(value), op1, op2, context), \
+        /*standardized_args=*/(value, lhs, rhs, context, decnum_mask) \
+    ) \
 
+ION_DECIMAL_CALC_THREE_OP(ion_decimal_fma, decQuadFMA, decNumberFMA);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_add, decQuadAdd, decNumberAdd);
 
-#define ION_DECIMAL_OVERFLOW_API_TWO_OPERAND(name, if_quad, if_number) \
-iERR _##name##_standardized(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, int decnum_mask) { \
-    iENTER; \
-    BYTE operands_buffer[2 * ION_DECNUMBER_DECQUAD_SIZE]; \
-    size_t offset; \
-    decNumber *op1, *op2; \
-    memset(operands_buffer, 0, 2 * ION_DECNUMBER_DECQUAD_SIZE); \
-    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
-    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1); \
-    IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value))); \
-    if_number(ION_DECIMAL_AS_NUMBER(value), op1, op2, context); \
-    value->type = ION_DECIMAL_TYPE_NUMBER; \
-    iRETURN; \
-} \
-iERR name(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context) { \
-    iENTER; \
-    uint32_t status; \
-    int decnum_mask =     (lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) \
-                        | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0); \
-    if (decnum_mask > 0 && decnum_mask < 3) { \
-        /* Not all operands have the same type. Convert all non-decNumbers to decNumbers. */ \
-        IONCHECK(_##name##_standardized(value, lhs, rhs, context, decnum_mask)); \
-    } \
-    else if (decnum_mask){ \
-        ASSERT(decnum_mask == 3); \
-        /* All operands are decNumbers. */ \
-        IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &ION_DECIMAL_AS_NUMBER(value))); \
-        if_number(ION_DECIMAL_AS_NUMBER(value), ION_DECIMAL_AS_NUMBER(lhs), ION_DECIMAL_AS_NUMBER(rhs), context); \
-        value->type = ION_DECIMAL_TYPE_NUMBER; \
-    } \
-    else { \
-        ASSERT(decnum_mask == 0); \
-        /* All operands are decQuads. */ \
-        status = decContextSaveStatus(context, DEC_Inexact); \
-        decContextClearStatus(context, DEC_Inexact); \
-        if_quad(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), context); \
-        value->type = ION_DECIMAL_TYPE_QUAD; \
-        if (decContextTestStatus(context, DEC_Inexact)) { \
-            /* The operation overflowed the maximum decQuad precision. Convert operands and result to decNumbers. */ \
-            IONCHECK(_##name##_standardized(value, lhs, rhs, context, decnum_mask)); \
-        } \
-        decContextRestoreStatus(context, status, DEC_Inexact); \
-    } \
-    iRETURN; \
+iERR _ion_decimal_equals_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, BOOL *is_equal) {
+    iENTER;
+    int decnum_mask = (lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0);
+    ION_DECIMAL_CONVERT_TWO_OPERAND;
+    IONCHECK(_ion_decimal_equals_number(op1, op2, context, is_equal));
+    iRETURN;
 }
 
-ION_DECIMAL_OVERFLOW_API_TWO_OPERAND(ion_decimal_add, decQuadAdd, decNumberAdd);
+iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
+    iENTER;
+    ASSERT(is_equal);
+    if (left->type != right->type) {
+        IONCHECK(_ion_decimal_equals_helper(left, right, context, is_equal));
+        SUCCEED();
+    }
+    switch (left->type) {
+        case ION_DECIMAL_TYPE_QUAD:
+        IONCHECK(ion_decimal_equals_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, is_equal));
+            break;
+        case ION_DECIMAL_TYPE_NUMBER:
+        IONCHECK(_ion_decimal_equals_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, is_equal));
+            break;
+        default:
+        FAILWITH(IERR_INVALID_ARG);
+    }
+    iRETURN;
+}

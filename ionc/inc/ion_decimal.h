@@ -150,8 +150,8 @@ ION_API_EXPORT iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *numbe
 
 
 ION_API_EXPORT iERR ion_decimal_fma(ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, decContext *);
-ION_API_EXPORT iERR ion_decimal_fma_macro(ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, decContext *);
 ION_API_EXPORT iERR ion_decimal_add(ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, decContext *);
+
 
 #ifdef __cplusplus
 }
