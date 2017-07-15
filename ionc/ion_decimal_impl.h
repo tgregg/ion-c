@@ -22,6 +22,11 @@
 #endif
 #define DECNUMDIGITS DECQUAD_Pmax
 
+#define ION_DECNUMBER_UNITS_SIZE(decimal_digits) \
+     (sizeof(decNumberUnit) * (((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0))))
+
+#define ION_DECNUMBER_SIZE(decimal_digits) (sizeof(decNumber) + ION_DECNUMBER_UNITS_SIZE(decimal_digits))
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -416,7 +416,7 @@ iERR _ion_binary_read_decimal_helper(ION_STREAM *pstream, int32_t len, int32_t e
         IONCHECK(_ion_decimal_number_alloc(pstream, decimal_digits, p_num));
         saved_status = decContextSaveStatus(context, DEC_Inexact);
         decContextClearStatus(context, DEC_Inexact);
-        IONCHECK(ion_int_to_decimal_number(&mantissa, *p_num, context));
+        IONCHECK(_ion_int_to_decimal_number(&mantissa, *p_num, context));
         if (decContextTestStatus(context, DEC_Inexact)) {
             // The value is too large to fit in any decimal representation. Rather than silently losing precision, fail.
             FAILWITH(IERR_NUMERIC_OVERFLOW);

@@ -12,16 +12,11 @@
  * language governing permissions and limitations under the License.
  */
 
-#include <inc/ion_decimal.h>
 #include "ion.h"
 #include "ion_helpers.h"
 #include "ion_decimal_impl.h"
 #include "decimal128.h"
 
-#define ION_DECNUMBER_UNITS_SIZE(decimal_digits) \
-     (sizeof(decNumberUnit) * (((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0))))
-
-#define ION_DECNUMBER_SIZE(decimal_digits) (sizeof(decNumber) + ION_DECNUMBER_UNITS_SIZE(decimal_digits))
 #define ION_DECNUMBER_DECQUAD_SIZE ION_DECNUMBER_SIZE(DECQUAD_Pmax)
 
 iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_number) {
@@ -268,6 +263,99 @@ iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
     ION_DECIMAL_API(value, decQuadToString(quad_value, p_string), decNumberToString(num_value, p_string));
 }
 
+#define ION_DECIMAL_UTILITY_API(name, if_quad, if_number) \
+    uint32_t name(const ION_DECIMAL *value) { \
+        ION_DECIMAL_API(value, return if_quad(value), return if_number(num_value)); \
+    }
+
+ION_DECIMAL_UTILITY_API(ion_decimal_is_finite, decQuadIsFinite, decNumberIsFinite);
+ION_DECIMAL_UTILITY_API(ion_decimal_is_infinite, decQuadIsInfinite, decNumberIsInfinite);
+ION_DECIMAL_UTILITY_API(ion_decimal_is_nan, decQuadIsNaN, decNumberIsNaN);
+ION_DECIMAL_UTILITY_API(ion_decimal_is_negative, decQuadIsNegative, decNumberIsNegative);
+ION_DECIMAL_UTILITY_API(ion_decimal_is_zero, decQuadIsZero, decNumberIsZero);
+ION_DECIMAL_UTILITY_API(ion_decimal_is_canonical, decQuadIsCanonical, decNumberIsCanonical);
+ION_DECIMAL_UTILITY_API(ion_decimal_radix, decQuadRadix, decNumberRadix);
+
+uint32_t ion_decimal_is_normal(const ION_DECIMAL *value, decContext *context) {
+    ION_DECIMAL_API(value, return decQuadIsNormal(quad_value), return decNumberIsNormal(num_value, context));
+}
+
+uint32_t ion_decimal_is_subnormal(const ION_DECIMAL *value, decContext *context) {
+    ION_DECIMAL_API(value, return decQuadIsSubnormal(quad_value), return decNumberIsSubnormal(num_value, context));
+}
+
+int32_t ion_decimal_get_exponent(const ION_DECIMAL *value) {
+    ION_DECIMAL_API(value, return decQuadGetExponent(quad_value), return num_value->exponent);
+}
+
+uint32_t ion_decimal_digits(const ION_DECIMAL *value) {
+    ION_DECIMAL_API(value, return decQuadDigits(quad_value), return num_value->digits);
+}
+
+uint32_t ion_decimal_same_quantum(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs) {
+    return (uint32_t)(ion_decimal_get_exponent(lhs) == ion_decimal_get_exponent(rhs));
+}
+
+uint32_t ion_decimal_is_integer(const ION_DECIMAL *value) {
+    ION_DECIMAL_API(value, return decQuadIsInteger(quad_value), return num_value->exponent == 0);
+}
+
+iERR ion_decimal_zero(ION_DECIMAL *value) {
+    ION_DECIMAL_API(value, decQuadZero(quad_value), decNumberZero(num_value));
+}
+
+#define ION_DECIMAL_CONVERSION_API(name, type, if_quad, if_number) \
+iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
+    iENTER; \
+    uint32_t status; \
+    \
+    ASSERT(p_out); \
+    \
+    status = decContextSaveStatus(context, DEC_Inexact | DEC_Invalid_operation); \
+    decContextClearStatus(context, DEC_Inexact | DEC_Invalid_operation); \
+    ION_DECIMAL_IF_QUAD(value) { \
+        *p_out = if_quad(ION_DECIMAL_AS_QUAD(value), context, context->round); \
+    } \
+    ION_DECIMAL_ELSE_IF_NUMBER(value) { \
+        *p_out = if_number(ION_DECIMAL_AS_NUMBER(value), context); \
+    } \
+    ION_DECIMAL_ENDIF; \
+    if (decContextTestStatus(context, DEC_Inexact)) { \
+        err = IERR_NUMERIC_OVERFLOW; \
+    } \
+    if (decContextTestStatus(context, DEC_Invalid_operation)) { \
+        err = IERR_INVALID_ARG; \
+    } \
+    decContextRestoreStatus(context, status, DEC_Inexact | DEC_Invalid_operation); \
+    iRETURN; \
+}
+
+ION_DECIMAL_CONVERSION_API(ion_decimal_to_int32, int32_t, decQuadToInt32Exact, decNumberToInt32);
+ION_DECIMAL_CONVERSION_API(ion_decimal_to_uint32, uint32_t, decQuadToUInt32Exact, decNumberToUInt32);
+
+iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int) {
+    iENTER;
+    if (!ion_decimal_is_integer(value)) {
+        FAILWITH(IERR_INVALID_ARG);
+    }
+    ION_DECIMAL_IF_QUAD(value) {
+        IONCHECK(ion_int_from_decimal(p_int, quad_value, context))
+    } \
+    ION_DECIMAL_ELSE_IF_NUMBER(value) {
+        IONCHECK(_ion_int_from_decimal_number(p_int, num_value, context))
+    }
+    ION_DECIMAL_ENDIF;
+    iRETURN;
+}
+
+iERR ion_decimal_from_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int) {
+    ION_DECIMAL_API (
+        value,
+        IONCHECK(ion_int_to_decimal(p_int, quad_value, context)),
+        IONCHECK(_ion_int_to_decimal_number(p_int, num_value, context))
+    );
+}
+
 #define ION_DECIMAL_QUAD_TO_NUM(dec, dn, ord) \
     if ((decnum_mask & (1 << ord)) == 0) { \
         offset = ord * ION_DECNUMBER_DECQUAD_SIZE; \
@@ -370,6 +458,23 @@ iERR name api_args { \
 
 ION_DECIMAL_CALC_THREE_OP(ion_decimal_fma, decQuadFMA, decNumberFMA);
 ION_DECIMAL_CALC_TWO_OP(ion_decimal_add, decQuadAdd, decNumberAdd);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_and, decQuadAnd, decNumberAnd);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_divide, decQuadDivide, decNumberDivide);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_divide_integer, decQuadDivideInteger, decNumberDivideInteger);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_max, decQuadMax, decNumberMax);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_max_mag, decQuadMaxMag, decNumberMaxMag);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_min, decQuadMin, decNumberMin);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_min_mag, decQuadMinMag, decNumberMinMag);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_multiply, decQuadMultiply, decNumberMultiply);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_or, decQuadOr, decNumberOr);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_quantize, decQuadQuantize, decNumberQuantize);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_remainder, decQuadRemainder, decNumberRemainder);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_remainder_near, decQuadRemainderNear, decNumberRemainderNear);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_rotate, decQuadRotate, decNumberRotate);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_scaleb, decQuadScaleB, decNumberScaleB);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_shift, decQuadShift, decNumberShift);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_subtract, decQuadSubtract, decNumberSubtract);
+ION_DECIMAL_CALC_TWO_OP(ion_decimal_xor, decQuadXor, decNumberXor);
 
 iERR _ion_decimal_equals_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, BOOL *is_equal) {
     iENTER;
@@ -388,13 +493,13 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
     }
     switch (left->type) {
         case ION_DECIMAL_TYPE_QUAD:
-        IONCHECK(ion_decimal_equals_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, is_equal));
+            IONCHECK(ion_decimal_equals_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, is_equal));
             break;
         case ION_DECIMAL_TYPE_NUMBER:
-        IONCHECK(_ion_decimal_equals_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, is_equal));
+            IONCHECK(_ion_decimal_equals_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, is_equal));
             break;
         default:
-        FAILWITH(IERR_INVALID_ARG);
+            FAILWITH(IERR_INVALID_ARG);
     }
     iRETURN;
 }

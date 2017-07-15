@@ -662,7 +662,7 @@ iERR _ion_writer_binary_decimal_number_len_and_mantissa(ION_WRITER *pwriter, dec
     ASSERT(!decNumberIsZero(value));
 
     IONCHECK(ion_int_init(p_int_mantissa, pwriter));
-    IONCHECK(ion_int_from_decimal_number(p_int_mantissa, value, context));
+    IONCHECK(_ion_int_from_decimal_number(p_int_mantissa, value, context));
     *p_len += ion_binary_len_var_int_64(value->exponent);
     *p_mantissa_len = _ion_int_abs_bytes_signed_length_helper(p_int_mantissa);
     *p_len += *p_mantissa_len;

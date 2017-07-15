@@ -41,6 +41,7 @@
 #include <decNumber.h>
 #include <decContext.h>
 #include "ion_internal.h"
+#include "ion_decimal_impl.h"
 
 iERR ion_int_alloc(void *owner, ION_INT **piint)
 {
@@ -678,7 +679,7 @@ iERR ion_int_from_decimal(ION_INT *iint, const decQuad *p_value, decContext *con
     iRETURN;
 }
 
-iERR ion_int_from_decimal_number(ION_INT *iint, const decNumber *p_value, decContext *context)
+iERR _ion_int_from_decimal_number(ION_INT *iint, const decNumber *p_value, decContext *context)
 {
     iENTER;
     BOOL     is_neg;
@@ -975,18 +976,15 @@ iERR ion_int_to_decimal(ION_INT *iint, decQuad *p_quad, decContext *context)
     iRETURN;
 }
 
-iERR ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *context)
+iERR _ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *context)
 {
     iENTER;
     II_DIGIT *digits, *end, digit;
-    // NOTE: a decNumber is about 11 bytes and the digit base fits in 8 bytes (32 bits in 10 decimal digits, with
-    // DECDPUN=3 digits per decimal unit = 4 required decimal units, with sizeof(decNumberUnit)=2), so the decNumber
-    // representing II_BASE needs about 19 bytes total. Some extra space is allocated here just in case this changes
-    // slightly.
-    char dec_int32_buf[32];
+    // NOTE: 32-bit integers fit in 10 decimal digits.
+    char dec_int32_buf[ION_DECNUMBER_SIZE(10)];
     decNumber *dec_digit;
 
-    memset(dec_int32_buf, 0, 32);
+    memset(dec_int32_buf, 0, ION_DECNUMBER_SIZE(10));
     _ion_int_init_globals();
 
     IONCHECK(_ion_int_validate_non_null_arg_with_ptr(iint, p_value));
@@ -1017,12 +1015,9 @@ iERR ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *co
 //
 ///////////////////////////////////////////////////////////////////
 
-// NOTE: a decNumber is about 11 bytes and the digit base fits in 8 bytes (32 bits in 10 decimal digits, with
-// DECDPUN=3 digits per decimal unit = 4 required decimal units, with sizeof(decNumberUnit)=2), so the decNumber
-// representing II_BASE needs about 19 bytes total. Some extra space is allocated here just in case this changes
-// slightly.
+// II_BASE fits in 10 decimal digits.
 // TODO find a better (i.e. thread-safe) way of managing globals. See similar comments in ion_symbol_table.c
-static char gDigitBaseBigBuffer[32];
+static char gDigitBaseBigBuffer[ION_DECNUMBER_SIZE(10)];
 
 int _ion_int_init_globals_helper()
 {

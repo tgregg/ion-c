@@ -80,6 +80,8 @@ ION_API_EXPORT iERR ion_decimal_release(ION_DECIMAL *value);
 /**
  * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
  * equivalent for the normalized values (even for zero).
+ *
+ * @deprecated - use of decQuads directly is deprecated. ION_DECIMAL should be used. See `ion_decimal_equals`.
  */
 ION_API_EXPORT iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
 
@@ -148,9 +150,47 @@ ION_API_EXPORT iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad);
  */
 ION_API_EXPORT iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *number);
 
+ION_API_EXPORT iERR ion_decimal_from_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int);
 
-ION_API_EXPORT iERR ion_decimal_fma(ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, decContext *);
-ION_API_EXPORT iERR ion_decimal_add(ION_DECIMAL *, const ION_DECIMAL *, const ION_DECIMAL *, decContext *);
+ION_API_EXPORT iERR ion_decimal_to_int32(const ION_DECIMAL *value, decContext *context, int32_t *p_int);
+ION_API_EXPORT iERR ion_decimal_to_uint32(const ION_DECIMAL *value, decContext *context, uint32_t *p_int);
+ION_API_EXPORT iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int);
+
+ION_API_EXPORT iERR ion_decimal_fma(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_add(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_and(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_divide(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_divide_integer(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_max(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_max_mag(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_min(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_min_mag(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_multiply(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_or(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_quantize(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_remainder(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_remainder_near(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_rotate(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_scaleb(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_shift(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_subtract(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_xor(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_zero(ION_DECIMAL *value);
+
+ION_API_EXPORT uint32_t ion_decimal_digits(const ION_DECIMAL *value);
+ION_API_EXPORT int32_t ion_decimal_get_exponent(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_radix(const ION_DECIMAL *value);
+
+ION_API_EXPORT uint32_t ion_decimal_same_quantum(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs);
+ION_API_EXPORT uint32_t ion_decimal_is_integer(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_subnormal(const ION_DECIMAL *value, decContext *context);
+ION_API_EXPORT uint32_t ion_decimal_is_normal(const ION_DECIMAL *value, decContext *context);
+ION_API_EXPORT uint32_t ion_decimal_is_finite(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_infinite(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_nan(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_negative(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_zero(const ION_DECIMAL *value);
+ION_API_EXPORT uint32_t ion_decimal_is_canonical(const ION_DECIMAL *value);
 
 
 #ifdef __cplusplus
