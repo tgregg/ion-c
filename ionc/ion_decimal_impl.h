@@ -17,7 +17,7 @@
 
 #include "ion_types.h"
 
-#ifndef DECNUMDIGITS
+#ifdef DECNUMDIGITS
     #undef DECNUMDIGITS
 #endif
 #define DECNUMDIGITS DECQUAD_Pmax

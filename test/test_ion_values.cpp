@@ -50,6 +50,16 @@ TEST(IonDecimal, FMADecQuad) {
     ION_ASSERT_OK(ion_decimal_from_int32(&expected, 101));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result));
 }
+
+TEST(IonDecimal, FMADecQuadInPlaceAllOperandsSame) {
+    ION_DECIMAL lhs, expected;
+    // The operands are all backed by decQuads.
+    ION_ASSERT_OK(ion_decimal_from_int32(&lhs, 10));
+    ION_ASSERT_OK(ion_decimal_fma(&lhs, &lhs, &lhs, &lhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_int32(&expected, 110));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
+}
+
 TEST(IonDecimal, FMADecNumber) {
     ION_DECIMAL result, lhs, rhs, fhs, expected;
     // Because these decimals have more than DECQUAD_Pmax digits, they will be backed by decNumbers.
@@ -85,6 +95,43 @@ TEST(IonDecimal, FMAMixed) {
     ION_ASSERT_OK(ion_decimal_release(&result));
 }
 
+TEST(IonDecimal, FMAMixedInPlaceNumber) {
+    ION_DECIMAL lhs, rhs, fhs, expected;
+    // Because this decimal has more than DECQUAD_Pmax digits, it will be backed by a decNumber.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    // These operands are backed by decQuads. They will be temporarily converted to decNumbers to perform the calculation.
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    ION_ASSERT_OK(ion_decimal_fma(&lhs, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "1000000000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+}
+
+TEST(IonDecimal, FMAMixedInPlaceQuad) {
+    ION_DECIMAL lhs, rhs, fhs, expected;
+    // Because this decimal has more than DECQUAD_Pmax digits, it will be backed by a decNumber.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "100000000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    // These operands are backed by decQuads. They will be temporarily converted to decNumbers to perform the calculation.
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    ION_ASSERT_OK(ion_decimal_fma(&fhs, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "1000000000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &fhs));
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, lhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+    ION_ASSERT_OK(ion_decimal_release(&fhs));
+}
+
 TEST(IonDecimal, FMADecQuadOverflows) {
     ION_DECIMAL result, lhs, rhs, fhs, expected;
     // This decimal has exactly DECQUAD_Pmax digits, so it fits into a decQuad.
@@ -105,6 +152,46 @@ TEST(IonDecimal, FMADecQuadOverflows) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
 
     ION_ASSERT_OK(ion_decimal_release(&result));
+}
+
+TEST(IonDecimal, FMADecQuadOverflowsInPlace) {
+    ION_DECIMAL lhs, rhs, fhs, expected;
+    // This decimal has exactly DECQUAD_Pmax digits, so it fits into a decQuad.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "1000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 10));
+    ION_ASSERT_OK(ion_decimal_from_int32(&fhs, 1));
+    // The operation will try to keep this in decQuads, but detects overflow and upgrades them to decNumbers.
+    ION_ASSERT_OK(ion_decimal_fma(&lhs, &lhs, &rhs, &fhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000011.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
+
+    // Asserts that the operation results in a decNumber.
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, lhs.type);
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+}
+
+TEST(IonDecimal, FMADecQuadOverflowsTwoOperandsSameAsOutput) {
+    ION_DECIMAL lhs, rhs, expected;
+    // This decimal has exactly DECQUAD_Pmax digits, so it fits into a decQuad.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "1000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 11));
+    // The operation will try to keep this in decQuads, but detects overflow and upgrades them to decNumbers.
+    ION_ASSERT_OK(ion_decimal_fma(&rhs, &lhs, &rhs, &rhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "11000000000000000000000000000000022.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &rhs));
+
+    // Asserts that the operation results in a decNumber.
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, rhs.type);
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&rhs));
 }
 
 TEST(IonDecimal, AddDecQuad) {
@@ -167,6 +254,34 @@ TEST(IonDecimal, AddDecQuadOverflows) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
 
     ION_ASSERT_OK(ion_decimal_release(&result));
+}
+
+TEST(IonDecimal, AddDecQuadOverflowsInPlace) {
+    ION_DECIMAL lhs, rhs, expected;
+    // This decimal has exactly DECQUAD_Pmax digits, so it fits into a decQuad.
+    ION_ASSERT_OK(ion_decimal_from_string(&lhs, "9999999999999999999999999999999999.", &g_TestDecimalContext, NULL));
+    ION_ASSERT_OK(ion_decimal_from_int32(&rhs, 2));
+    // The operation will try to keep this in decQuads, but detects overflow and upgrades them to decNumbers.
+    ION_ASSERT_OK(ion_decimal_add(&lhs, &lhs, &rhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000001.", &g_TestDecimalContext, NULL));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
+
+    // Asserts that the operation results in a decNumber.
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, lhs.type);
+
+    // Asserts that the operation did not change the operands.
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
+
+    ION_ASSERT_OK(ion_decimal_release(&lhs));
+}
+
+TEST(IonDecimal, AddDecQuadInPlaceAllOperandsSame) {
+    ION_DECIMAL lhs, expected;
+    ION_ASSERT_OK(ion_decimal_from_int32(&lhs, 1));
+    ION_ASSERT_OK(ion_decimal_add(&lhs, &lhs, &lhs, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_int32(&expected, 2));
+    ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
 }
 
 TEST(IonDecimal, EqualsWithMixedOperands) {
