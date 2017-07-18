@@ -314,10 +314,10 @@ iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
     status = decContextSaveStatus(context, DEC_Inexact | DEC_Invalid_operation); \
     decContextClearStatus(context, DEC_Inexact | DEC_Invalid_operation); \
     ION_DECIMAL_IF_QUAD(value) { \
-        *p_out = if_quad(ION_DECIMAL_AS_QUAD(value), context, context->round); \
+        *p_out = if_quad(quad_value, context, context->round); \
     } \
     ION_DECIMAL_ELSE_IF_NUMBER(value) { \
-        *p_out = if_number(ION_DECIMAL_AS_NUMBER(value), context); \
+        *p_out = if_number(num_value, context); \
     } \
     ION_DECIMAL_ENDIF; \
     if (decContextTestStatus(context, DEC_Inexact)) { \

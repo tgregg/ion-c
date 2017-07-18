@@ -301,3 +301,24 @@ TEST(IonDecimal, EqualsWithMixedOperands) {
     ASSERT_TRUE(assertIonDecimalEq(&rhs, &rhs));
     ASSERT_TRUE(assertIonDecimalEq(&lhs, &lhs));
 }
+
+TEST(IonDecimal, IsNegative) {
+    ION_DECIMAL ion_number_positive, ion_number_negative, ion_quad_positive, ion_quad_negative;
+    decNumber number_positive, number_negative;
+    decQuad quad_positive, quad_negative;
+
+    decNumberFromInt32(&number_positive, 1);
+    decNumberFromInt32(&number_negative, -1);
+    decQuadFromInt32(&quad_positive, 1);
+    decQuadFromInt32(&quad_negative, -1);
+
+    ION_ASSERT_OK(ion_decimal_from_number(&ion_number_positive, &number_positive));
+    ION_ASSERT_OK(ion_decimal_from_number(&ion_number_negative, &number_negative));
+    ION_ASSERT_OK(ion_decimal_from_quad(&ion_quad_positive, &quad_positive));
+    ION_ASSERT_OK(ion_decimal_from_quad(&ion_quad_negative, &quad_negative));
+
+    ASSERT_TRUE(ion_decimal_is_negative(&ion_number_negative));
+    ASSERT_TRUE(ion_decimal_is_negative(&ion_quad_negative));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_positive));
+}
