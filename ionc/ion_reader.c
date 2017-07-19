@@ -1448,7 +1448,7 @@ iERR _ion_reader_read_ion_decimal_helper(ION_READER *preader, ION_DECIMAL *p_val
             FAILWITH(IERR_INVALID_STATE);
     }
     if (num_value) {
-        p_value->type = ION_DECIMAL_TYPE_NUMBER;
+        p_value->type = ION_DECIMAL_TYPE_NUMBER_OWNED;
         p_value->value.num_value = num_value;
     }
     else {

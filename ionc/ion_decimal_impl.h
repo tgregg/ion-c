@@ -27,6 +27,8 @@
 
 #define ION_DECNUMBER_SIZE(decimal_digits) (sizeof(decNumber) + ION_DECNUMBER_UNITS_SIZE(decimal_digits))
 
+#define ION_DECIMAL_IS_NUMBER(dec) (dec->type == ION_DECIMAL_TYPE_NUMBER || dec->type == ION_DECIMAL_TYPE_NUMBER_OWNED)
+
 #ifdef __cplusplus
 extern "C" {
 #endif

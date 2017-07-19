@@ -32,9 +32,13 @@ typedef enum {
      */
     ION_DECIMAL_TYPE_QUAD = 1,
     /**
-     * The _ion_decimal holds a decNumber.
+     * The _ion_decimal holds an unowned decNumber.
      */
     ION_DECIMAL_TYPE_NUMBER = 2,
+    /**
+     * The _ion_decimal holds a decNumber whose memory is managed by an owner.
+     */
+    ION_DECIMAL_TYPE_NUMBER_OWNED = 3,
 
 } ION_DECIMAL_TYPE;
 
@@ -60,18 +64,12 @@ ION_API_EXPORT iERR ion_decimal_get_double_value   (decQuad *dec, double *p_valu
  * function has been called on a value, `ion_decimal_release` must be called on the same value to free the copied
  * memory.
  *
- * NOTE: this function should not be called on values that do not need to remain in scope after the reader is closed;
- * doing so may force an unnecessary copy.
- *
  * @param value - The value to claim.
  */
 ION_API_EXPORT iERR ion_decimal_claim(ION_DECIMAL *value);
 
 /**
- * Frees any memory that was allocated during the corresponding call to `ion_decimal_claim` on this value.
- *
- * NOTE: it is an error to call this function on a value that has not been claimed; values that haven't been claimed do
- * not need to be released manually.
+ * Frees any memory that was allocated when constructing this value. This should be called to clean up all ION_DECIMALs.
  *
  * @param value - The value to release.
  */
@@ -107,11 +105,9 @@ ION_API_EXPORT iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_stri
  *   or 'e'.
  * @param context - the context to use for the conversion. If the decimal lies outside of the context's limits, an error
  *   is raised.
- * @param owner - the memory owner of any dynamically allocated memory required to represent the full-fidelity decimal.
- *   If null, it is the caller's responsibility to eventually free the `value` by calling `ion_decimal_release`.
  * @return IERR_NUMERIC_OVERFLOW if the decimal lies outside of the context's limits, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context, hOWNER owner);
+ION_API_EXPORT iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context);
 
 /**
  * Represents the given uint32 as an ION_DECIMAL. This function has no side effects that cause the resulting ION_DECIMAL
@@ -143,8 +139,8 @@ ION_API_EXPORT iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad);
  * Represents the given decNumber as an ION_DECIMAL. This function does not allocate or copy any memory, so the caller
  * IS required to keep the given decNumber in scope for the lifetime of the resulting ION_DECIMAL. If desired, the
  * caller can alleviate this requirement by calling `ion_decimal_claim` on the resulting ION_DECIMAL (note that this
- * forces a copy). If this is done, `ion_decimal_release` must eventually be called. Either way, it is the caller's
- * responsibility to eventually free any dynamically allocated memory used by the given decNumber.
+ * forces a copy). It is the caller's responsibility to eventually free any dynamically allocated memory used by the
+ * given decNumber (calling `ion_decimal_release` will not free this memory).
  *
  * @return IERR_OK (no errors are possible).
  */

@@ -15,6 +15,7 @@
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"
+#include "ion_decimal_impl.h"
 
 TEST(IonBinaryLen, UInt64) {
 
@@ -362,7 +363,7 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal_before));
     // Make sure we start with a full-fidelity decimal, otherwise the test would incorrectly succeed.
-    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal_before.type);
+    ASSERT_TRUE(ION_DECIMAL_IS_NUMBER((&ion_decimal_before)));
     ASSERT_EQ(53, ion_decimal_before.value.num_value->digits);
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
@@ -410,7 +411,7 @@ TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
-    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal.type);
+    ASSERT_TRUE(ION_DECIMAL_IS_NUMBER((&ion_decimal)));
     ASSERT_EQ(53, ion_decimal.value.num_value->digits);
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));
@@ -460,7 +461,7 @@ TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
     ION_ASSERT_OK(ion_reader_next(reader, &type));
     ASSERT_EQ(tid_DECIMAL, type);
     ION_ASSERT_OK(ion_reader_read_ion_decimal(reader, &ion_decimal));
-    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_decimal.type);
+    ASSERT_TRUE(ION_DECIMAL_IS_NUMBER((&ion_decimal)));
     ASSERT_EQ(53, ion_decimal.value.num_value->digits);
 
     ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, TRUE));

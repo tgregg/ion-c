@@ -1079,6 +1079,7 @@ iERR _ion_writer_write_ion_decimal_helper(ION_WRITER *pwriter, ION_DECIMAL *valu
                 case ION_DECIMAL_TYPE_QUAD:
                     IONCHECK(_ion_writer_text_write_decimal_quad(pwriter, &value->value.quad_value));
                     break;
+                case ION_DECIMAL_TYPE_NUMBER_OWNED:
                 case ION_DECIMAL_TYPE_NUMBER:
                     IONCHECK(_ion_writer_text_write_decimal_number(pwriter, value->value.num_value));
                     break;
@@ -1089,10 +1090,11 @@ iERR _ion_writer_write_ion_decimal_helper(ION_WRITER *pwriter, ION_DECIMAL *valu
         case ion_type_binary_writer:
             switch(value->type) {
                 case ION_DECIMAL_TYPE_QUAD:
-                IONCHECK(_ion_writer_binary_write_decimal_quad(pwriter, &value->value.quad_value));
+                    IONCHECK(_ion_writer_binary_write_decimal_quad(pwriter, &value->value.quad_value));
                     break;
+                case ION_DECIMAL_TYPE_NUMBER_OWNED:
                 case ION_DECIMAL_TYPE_NUMBER:
-                IONCHECK(_ion_writer_binary_write_decimal_number(pwriter, value->value.num_value));
+                    IONCHECK(_ion_writer_binary_write_decimal_number(pwriter, value->value.num_value));
                     break;
                 default:
                 FAILWITH(IERR_INVALID_STATE);

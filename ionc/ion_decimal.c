@@ -40,9 +40,11 @@ iERR ion_decimal_claim(ION_DECIMAL *value) {
 
     switch (value->type) {
         case ION_DECIMAL_TYPE_QUAD:
-            // Nothing needs to be done; the decQuad lives within the ION_DECIMAL.
-            break;
         case ION_DECIMAL_TYPE_NUMBER:
+            // Nothing needs to be done: the decQuads live within the ION_DECIMAL and unowned decNumbers are not tied
+            // to an owner.
+            break;
+        case ION_DECIMAL_TYPE_NUMBER_OWNED:
             // The decNumber may have been allocated with an owner, meaning its memory will go out of scope when that
             // owner is closed. This copy extends that scope until ion_decimal_release.
             copy = ion_xalloc((size_t)ION_DECNUMBER_SIZE(value->value.num_value->digits));
@@ -59,14 +61,17 @@ iERR ion_decimal_release(ION_DECIMAL *value) {
     iENTER;
     switch (value->type) {
         case ION_DECIMAL_TYPE_QUAD:
-            // Nothing needs to be done; the decQuad lives within the ION_DECIMAL.
+        case ION_DECIMAL_TYPE_NUMBER_OWNED:
+            // Nothing needs to be done; the memory was not dynamically allocated.
             break;
         case ION_DECIMAL_TYPE_NUMBER:
             ion_xfree(value->value.num_value);
+            value->value.num_value = NULL;
             break;
         default:
             FAILWITH(IERR_INVALID_ARG);
     }
+    value->type = ION_DECIMAL_TYPE_UNKNOWN;
     iRETURN;
 }
 
@@ -187,10 +192,10 @@ iERR _ion_decimal_from_string_helper(char *str, decContext *context, hOWNER owne
     iRETURN;
 }
 
-iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context, hOWNER owner) {
+iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context) {
     iENTER;
     decNumber *num_value = NULL;
-    IONCHECK(_ion_decimal_from_string_helper(str, context, owner, ION_DECIMAL_AS_QUAD(value), &num_value));
+    IONCHECK(_ion_decimal_from_string_helper(str, context, NULL, ION_DECIMAL_AS_QUAD(value), &num_value));
     if (num_value) {
         value->type = ION_DECIMAL_TYPE_NUMBER;
         value->value.num_value = num_value;
@@ -225,7 +230,7 @@ iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad) {
 iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *number) {
     iENTER;
     value->value.num_value = number;
-    value->type = ION_DECIMAL_TYPE_NUMBER;
+    value->type = ION_DECIMAL_TYPE_NUMBER_OWNED;
     iRETURN;
 }
 
@@ -238,6 +243,7 @@ switch(ion_decimal->type) { \
 
 #define ION_DECIMAL_ELSE_IF_NUMBER(ion_decimal) \
         break; \
+    case ION_DECIMAL_TYPE_NUMBER_OWNED: \
     case ION_DECIMAL_TYPE_NUMBER: \
         num_value = ION_DECIMAL_AS_NUMBER(ion_decimal);
 
@@ -367,7 +373,7 @@ iERR ion_decimal_from_ion_int(const ION_DECIMAL *value, decContext *context, ION
         decQuadToNumber(ION_DECIMAL_AS_QUAD(dec), dn); \
     } \
     else { \
-        ASSERT(ION_DECIMAL_TYPE_NUMBER == dec->type); \
+        ASSERT(ION_DECIMAL_IS_NUMBER(dec)); \
         dn = dec->value.num_value; \
     } \
 
@@ -487,7 +493,7 @@ iERR name api_params { \
         /*api_params=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context), \
         calculate_quad, \
         /*quad_args=*/(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), ION_DECIMAL_AS_QUAD(fhs), context), \
-        /*calculate_decnum_mask=*/((lhs->type == ION_DECIMAL_TYPE_NUMBER ? ION_DECIMAL_LHS_BIT : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? ION_DECIMAL_RHS_BIT : 0) | (fhs->type == ION_DECIMAL_TYPE_NUMBER ? ION_DECIMAL_FHS_BIT : 0)), \
+        /*calculate_decnum_mask=*/((ION_DECIMAL_IS_NUMBER(lhs) ? ION_DECIMAL_LHS_BIT : 0) | (ION_DECIMAL_IS_NUMBER(rhs) ? ION_DECIMAL_RHS_BIT : 0) | (ION_DECIMAL_IS_NUMBER(fhs) ? ION_DECIMAL_FHS_BIT : 0)), \
         /*calculate_operand_mask=*/((value == lhs ? ION_DECIMAL_LHS_BIT : 0) | (value == rhs ? ION_DECIMAL_RHS_BIT : 0) | (value == fhs ? ION_DECIMAL_FHS_BIT : 0)), \
         /*restore_quad=*/ION_DECIMAL_RESTORE_QUAD_THREE_OPERAND, \
         calculate_number, \
@@ -505,7 +511,7 @@ iERR name api_params { \
         /*api_params=*/(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context), \
         calculate_quad, \
         /*quad_args=*/(ION_DECIMAL_AS_QUAD(value), ION_DECIMAL_AS_QUAD(lhs), ION_DECIMAL_AS_QUAD(rhs), context), \
-        /*calculate_decnum_mask=*/((lhs->type == ION_DECIMAL_TYPE_NUMBER ? ION_DECIMAL_LHS_BIT : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? ION_DECIMAL_RHS_BIT : 0)), \
+        /*calculate_decnum_mask=*/((ION_DECIMAL_IS_NUMBER(lhs) ? ION_DECIMAL_LHS_BIT : 0) | (ION_DECIMAL_IS_NUMBER(rhs) ? ION_DECIMAL_RHS_BIT : 0)), \
         /*calculate_operand_mask=*/((value == lhs ? ION_DECIMAL_LHS_BIT : 0) | (value == rhs ? ION_DECIMAL_RHS_BIT : 0)), \
         /*restore_quad=*/ION_DECIMAL_RESTORE_QUAD_TWO_OPERAND, \
         calculate_number, \
@@ -538,7 +544,7 @@ ION_DECIMAL_CALC_TWO_OP(ion_decimal_xor, decQuadXor, decNumberXor);
 
 iERR _ion_decimal_equals_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, BOOL *is_equal) {
     iENTER;
-    int decnum_mask = (lhs->type == ION_DECIMAL_TYPE_NUMBER ? 1 : 0) | (rhs->type == ION_DECIMAL_TYPE_NUMBER ? 2 : 0);
+    int decnum_mask = (ION_DECIMAL_IS_NUMBER(lhs) ? ION_DECIMAL_LHS_BIT : 0) | (ION_DECIMAL_IS_NUMBER(rhs) ? ION_DECIMAL_RHS_BIT : 0);
     ION_DECIMAL_CONVERT_TWO_OPERAND;
     IONCHECK(_ion_decimal_equals_number(op1, op2, context, is_equal));
     iRETURN;
@@ -547,7 +553,10 @@ iERR _ion_decimal_equals_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, 
 iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
     iENTER;
     ASSERT(is_equal);
-    if (left->type != right->type) {
+    if (ION_DECIMAL_IS_NUMBER(left) ^ ION_DECIMAL_IS_NUMBER(right)) {
+        if (left->type == ION_DECIMAL_TYPE_UNKNOWN || right->type == ION_DECIMAL_TYPE_UNKNOWN) {
+            FAILWITH(IERR_INVALID_ARG);
+        }
         IONCHECK(_ion_decimal_equals_helper(left, right, context, is_equal));
         SUCCEED();
     }
@@ -555,6 +564,7 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
         case ION_DECIMAL_TYPE_QUAD:
             IONCHECK(ion_decimal_equals_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, is_equal));
             break;
+        case ION_DECIMAL_TYPE_NUMBER_OWNED:
         case ION_DECIMAL_TYPE_NUMBER:
             IONCHECK(_ion_decimal_equals_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, is_equal));
             break;
@@ -563,3 +573,5 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
     }
     iRETURN;
 }
+
+// TODO the single operand APIs
