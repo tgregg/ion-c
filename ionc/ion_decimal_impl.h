@@ -17,15 +17,13 @@
 
 #include "ion_types.h"
 
-#ifdef DECNUMDIGITS
-    #undef DECNUMDIGITS
-#endif
-#define DECNUMDIGITS DECQUAD_Pmax
-
 #define ION_DECNUMBER_UNITS_SIZE(decimal_digits) \
-     (sizeof(decNumberUnit) * (((decimal_digits / DECDPUN) + ((decimal_digits % DECDPUN) ? 1 : 0))))
+    (sizeof(decNumberUnit) * ((((decimal_digits) / DECDPUN) + (((decimal_digits) % DECDPUN) ? 1 : 0))))
 
-#define ION_DECNUMBER_SIZE(decimal_digits) (sizeof(decNumber) + ION_DECNUMBER_UNITS_SIZE(decimal_digits))
+// NOTE: each decNumber has DECNUMUNITS preallocated units in its lsu array. These provide space for (DECNUMUNITS * DECDPUN)
+// decimal digits. Therefore, space for an additional (decimal_digits - (DECNUMUNITS * DECDPUN)) digits is needed.
+#define ION_DECNUMBER_SIZE(decimal_digits) \
+    (sizeof(decNumber) + ((decimal_digits > (DECNUMUNITS * DECDPUN)) ? ION_DECNUMBER_UNITS_SIZE(decimal_digits - (DECNUMUNITS * DECDPUN)) : 0))
 
 #define ION_DECIMAL_IS_NUMBER(dec) (dec->type == ION_DECIMAL_TYPE_NUMBER || dec->type == ION_DECIMAL_TYPE_NUMBER_OWNED)
 

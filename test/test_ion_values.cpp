@@ -15,6 +15,7 @@
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"
+#include "ion_decimal_impl.h"
 
 
 TEST(IonTimestamp, IgnoresSuperfluousOffset) {
@@ -372,4 +373,46 @@ TEST(IonDecimal, IsNegative) {
     ION_ASSERT_OK(ion_decimal_release(&ion_number_negative));
     ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive));
     ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
+}
+
+TEST(IonDecimal, AbsQuad) {
+    ION_DECIMAL ion_quad_negative, ion_quad_positive, ion_quad_positive_result;
+    ION_ASSERT_OK(ion_decimal_from_int32(&ion_quad_negative, -999999));
+    ION_ASSERT_OK(ion_decimal_from_int32(&ion_quad_positive, 999999));
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, ion_quad_negative.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, ion_quad_positive.type);
+    ASSERT_TRUE(ion_decimal_is_negative(&ion_quad_negative));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_positive));
+    ION_ASSERT_OK(ion_decimal_abs(&ion_quad_negative, &ion_quad_negative, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_abs(&ion_quad_positive_result, &ion_quad_positive, &g_TestDecimalContext));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_negative));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_positive));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_positive_result));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_quad_positive, &ion_quad_negative));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_quad_positive, &ion_quad_positive_result));
+
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive_result));
+}
+
+TEST(IonDecimal, AbsNumber) {
+    ION_DECIMAL ion_number_negative, ion_number_positive, ion_number_positive_result;
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_negative, "-999999999999999999999999999999999999999999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_positive, "999999999999999999999999999999999999999999", &g_TestDecimalContext));
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_number_negative.type);
+    ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, ion_number_positive.type);
+    ASSERT_TRUE(ion_decimal_is_negative(&ion_number_negative));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_abs(&ion_number_negative, &ion_number_negative, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_abs(&ion_number_positive_result, &ion_number_positive, &g_TestDecimalContext));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_negative));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive_result));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_negative));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_positive_result));
+
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_negative));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive_result));
 }

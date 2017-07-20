@@ -18,9 +18,25 @@
 #include "ion_types.h"
 #include "ion_platform_config.h"
 
+#ifndef DECNUMDIGITS
+    #error DECNUMDIGITS must be defined to be >= DECQUAD_Pmax
+#elif DECNUMDIGITS < DECQUAD_Pmax
+    #error DECNUMDIGITS must be defined to be >= DECQUAD_Pmax
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * TODO expand this general info section
+ * For calculation APIs, the output parameter (usually the first) is considered to be an uninitialized value (i.e.
+ * no effort is made to free its associated memory before overwriting it) UNLESS it is the same reference as one of
+ * the operands. If it is the same reference as one of its operands, the operation will be performed in-place if
+ * possible. If not possible, its memory will be freed and replaced with newly allocated memory to hold the result.
+ * To avoid memory leaks, it is important not to reuse ION_DECIMAL values as output parameters unless it is an in-place
+ * operation or the reused value has been uninitialized first using `ion_decimal_release`.
+ */
 
 /**
  * Determines which value of the _ion_decimal's `value` field is active.
@@ -172,6 +188,13 @@ ION_API_EXPORT iERR ion_decimal_shift(ION_DECIMAL *value, const ION_DECIMAL *lhs
 ION_API_EXPORT iERR ion_decimal_subtract(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_xor(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_zero(ION_DECIMAL *value);
+
+ION_API_EXPORT iERR ion_decimal_abs(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_invert(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_logb(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_minus(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_plus(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_reduce(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 
 ION_API_EXPORT uint32_t ion_decimal_digits(const ION_DECIMAL *value);
 ION_API_EXPORT int32_t ion_decimal_get_exponent(const ION_DECIMAL *value);

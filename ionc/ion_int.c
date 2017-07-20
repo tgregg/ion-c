@@ -39,9 +39,7 @@
 #define ION_INT_GLOBAL /* static */
 
 #include <decNumber.h>
-#include <decContext.h>
 #include "ion_internal.h"
-#include "ion_decimal_impl.h"
 
 iERR ion_int_alloc(void *owner, ION_INT **piint)
 {
@@ -980,23 +978,20 @@ iERR _ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *c
 {
     iENTER;
     II_DIGIT *digits, *end, digit;
-    // NOTE: 32-bit integers fit in 10 decimal digits.
-    char dec_int32_buf[ION_DECNUMBER_SIZE(10)];
-    decNumber *dec_digit;
+    decNumber dec_digit;
 
-    memset(dec_int32_buf, 0, ION_DECNUMBER_SIZE(10));
     _ion_int_init_globals();
 
     IONCHECK(_ion_int_validate_non_null_arg_with_ptr(iint, p_value));
 
     decNumberZero(p_value);
+    decNumberZero(&dec_digit);
     digits = iint->_digits;
     end    = digits + iint->_len;
-    dec_digit = (decNumber *)dec_int32_buf;
     while (digits < end) {
         digit = *digits++;
-        decNumberFromInt32(dec_digit, (int32_t)digit);
-        decNumberFMA(p_value, p_value, g_digit_base_number, dec_digit, context);
+        decNumberFromInt32(&dec_digit, (int32_t)digit);
+        decNumberFMA(p_value, p_value, &g_digit_base_number, &dec_digit, context);
     }
 
     if (iint->_signum == -1) {
@@ -1015,10 +1010,6 @@ iERR _ion_int_to_decimal_number(ION_INT *iint, decNumber *p_value, decContext *c
 //
 ///////////////////////////////////////////////////////////////////
 
-// II_BASE fits in 10 decimal digits.
-// TODO find a better (i.e. thread-safe) way of managing globals. See similar comments in ion_symbol_table.c
-static char gDigitBaseBigBuffer[ION_DECNUMBER_SIZE(10)];
-
 int _ion_int_init_globals_helper()
 {
     // invariant needed for add
@@ -1029,8 +1020,7 @@ int _ion_int_init_globals_helper()
     ASSERT((UINT64_MAX) >= ( (((II_LONG_DIGIT)II_MAX_DIGIT) * ((II_LONG_DIGIT)II_MAX_DIGIT)) + (((II_LONG_DIGIT)II_MAX_DIGIT)*2) ));
 
     decQuadFromUInt32(&g_digit_base_quad, II_BASE);
-    g_digit_base_number = (decNumber *)gDigitBaseBigBuffer;
-    decNumberFromUInt32(g_digit_base_number, II_BASE);
+    decNumberFromUInt32(&g_digit_base_number, II_BASE);
 
     return 0;
 }

@@ -366,33 +366,29 @@ iERR ion_decimal_from_ion_int(const ION_DECIMAL *value, decContext *context, ION
 #define ION_DECIMAL_RHS_BIT 0x2
 #define ION_DECIMAL_FHS_BIT 0x4
 
-#define ION_DECIMAL_QUAD_TO_NUM(dec, dn, ord) \
-    if ((decnum_mask & (1 << ord)) == 0) { \
-        offset = ord * ION_DECNUMBER_DECQUAD_SIZE; \
-        dn = (decNumber *)(operands_buffer + offset); \
+#define ION_DECIMAL_QUAD_TO_NUM(dec, dn, bit) \
+    if ((decnum_mask & bit) == 0) { \
         decQuadToNumber(ION_DECIMAL_AS_QUAD(dec), dn); \
     } \
     else { \
         ASSERT(ION_DECIMAL_IS_NUMBER(dec)); \
-        dn = dec->value.num_value; \
+        dn = ION_DECIMAL_AS_NUMBER(dec); \
     } \
 
 #define ION_DECIMAL_CONVERT_THREE_OPERAND \
-    BYTE operands_buffer[3 * ION_DECNUMBER_DECQUAD_SIZE]; \
-    size_t offset; \
-    decNumber *op1, *op2, *op3; \
-    memset(operands_buffer, 0, 3 * ION_DECNUMBER_DECQUAD_SIZE); \
-    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
-    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1); \
-    ION_DECIMAL_QUAD_TO_NUM(fhs, op3, 2);
+    /* These decNumbers only hold values that fit in a decQuad. Each decNumber is guaranteed to have enough space for \
+     * any decQuad value (because compilation fails if DECNUMDIGITS < 34), so these don't need extra padding. */ \
+    decNumber dn1, dn2, dn3; \
+    decNumber *op1 = &dn1, *op2 = &dn2, *op3 = &dn3; \
+    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, ION_DECIMAL_LHS_BIT); \
+    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, ION_DECIMAL_RHS_BIT); \
+    ION_DECIMAL_QUAD_TO_NUM(fhs, op3, ION_DECIMAL_FHS_BIT);
 
 #define ION_DECIMAL_CONVERT_TWO_OPERAND \
-    BYTE operands_buffer[2 * ION_DECNUMBER_DECQUAD_SIZE]; \
-    size_t offset; \
-    decNumber *op1, *op2; \
-    memset(operands_buffer, 0, 2 * ION_DECNUMBER_DECQUAD_SIZE); \
-    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, 0); \
-    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, 1);
+    decNumber dn1, dn2; \
+    decNumber *op1 = &dn1, *op2 = &dn2; \
+    ION_DECIMAL_QUAD_TO_NUM(lhs, op1, ION_DECIMAL_LHS_BIT); \
+    ION_DECIMAL_QUAD_TO_NUM(rhs, op2, ION_DECIMAL_RHS_BIT);
 
 #define ION_DECIMAL_RESTORE_QUAD_TWO_OPERAND \
     if (operand_mask & ION_DECIMAL_LHS_BIT) { \
@@ -574,4 +570,46 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
     iRETURN;
 }
 
-// TODO the single operand APIs
+#define ION_DECIMAL_CALC_ONE_OP(name, calculate_quad, calculate_number) \
+iERR name(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context) { \
+    iENTER; \
+    value->type = rhs->type; \
+    ION_DECIMAL_IF_QUAD(rhs) { \
+        calculate_quad(ION_DECIMAL_AS_QUAD(value), quad_value, context); \
+    } \
+    ION_DECIMAL_ELSE_IF_NUMBER(rhs) { \
+        if (value != rhs) { \
+            /* Need to make sure enough space is allocated to hold the result. Because single-operand operations can't \
+             * overflow, this only needs to be done for non-in-place calculations, and only needs enough space to hold
+             * the number of digits in rhs. */ \
+            IONCHECK(_ion_decimal_number_alloc(NULL, num_value->digits, &ION_DECIMAL_AS_NUMBER(value))); \
+            value->type = ION_DECIMAL_TYPE_NUMBER; \
+        } \
+        calculate_number(ION_DECIMAL_AS_NUMBER(value), num_value, context); \
+    } \
+    ION_DECIMAL_ENDIF; \
+    iRETURN; \
+}
+
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_abs, decQuadAbs, decNumberAbs);
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_invert, decQuadInvert, decNumberInvert);
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_logb, decQuadLogB, decNumberLogB);
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_minus, decQuadMinus, decNumberMinus);
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_plus, decQuadPlus, decNumberPlus);
+ION_DECIMAL_CALC_ONE_OP(ion_decimal_reduce, decQuadReduce, decNumberReduce);
+//ION_DECIMAL_CALC_ONE_OP(); // TODO to_integral_value
+//ION_DECIMAL_CALC_ONE_OP(); // TODO to_integral_value_exact
+
+// TODO other
+//canonical
+//copy
+//copy_abs
+//copy_negate
+//copy_sign
+/*
+ION_DECIMAL_CALC_ONE_OP();
+ION_DECIMAL_CALC_ONE_OP();
+ION_DECIMAL_CALC_ONE_OP();
+ION_DECIMAL_CALC_ONE_OP();
+ION_DECIMAL_CALC_ONE_OP();
+ */
