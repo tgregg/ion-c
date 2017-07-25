@@ -195,6 +195,14 @@ ION_API_EXPORT iERR ion_decimal_logb(ION_DECIMAL *value, const ION_DECIMAL *rhs,
 ION_API_EXPORT iERR ion_decimal_minus(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_plus(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_reduce(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_to_integral_exact(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+ION_API_EXPORT iERR ion_decimal_to_integral_value(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
+
+ION_API_EXPORT iERR ion_decimal_canonical(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_abs(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_negate(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_sign(ION_DECIMAL *value, const ION_DECIMAL *rhs, const ION_DECIMAL *lhs, decContext *context);
 
 ION_API_EXPORT uint32_t ion_decimal_digits(const ION_DECIMAL *value);
 ION_API_EXPORT int32_t ion_decimal_get_exponent(const ION_DECIMAL *value);

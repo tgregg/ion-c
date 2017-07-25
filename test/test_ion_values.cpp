@@ -416,3 +416,56 @@ TEST(IonDecimal, AbsNumber) {
     ION_ASSERT_OK(ion_decimal_release(&ion_number_negative));
     ION_ASSERT_OK(ion_decimal_release(&ion_number_positive_result));
 }
+
+TEST(IonDecimal, CopySign) {
+    ION_DECIMAL ion_number_positive, ion_quad_negative, ion_number_result;
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_positive, "999999999999999999999999999999999999999999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_int32(&ion_quad_negative, -1));
+    ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_copy_sign(&ion_number_result, &ion_number_positive, &ion_quad_negative, &g_TestDecimalContext));
+    ASSERT_TRUE(ion_decimal_is_negative(&ion_number_result));
+    ION_ASSERT_OK(ion_decimal_minus(&ion_number_result, &ion_number_result, &g_TestDecimalContext));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_result));
+
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+}
+
+TEST(IonDecimal, ToIntegralValue) {
+    ION_DECIMAL ion_quad, ion_quad_expected, ion_number, ion_number_expected, ion_number_result;
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_quad, "9999.999e3", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number, "999999999999999999999999999999999999999999.999e3", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_to_integral_value(&ion_quad, &ion_quad, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_to_integral_value(&ion_number_result, &ion_number, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_quad_expected, "9999999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_expected, "999999999999999999999999999999999999999999999", &g_TestDecimalContext));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_quad_expected, &ion_quad));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number_result));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number));
+
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_expected));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_expected));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+}
+
+TEST(IonDecimal, ToIntegralValueRounded) {
+    ION_DECIMAL ion_quad, ion_quad_expected, ion_number, ion_number_expected, ion_number_result;
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_quad, "9998.999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number, "999999999999999999999999999999999999999998.999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_to_integral_value(&ion_quad, &ion_quad, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_to_integral_value(&ion_number_result, &ion_number, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_quad_expected, "9999", &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_expected, "999999999999999999999999999999999999999999", &g_TestDecimalContext));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_quad_expected, &ion_quad));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number_result));
+    ASSERT_FALSE(assertIonDecimalEq(&ion_number_expected, &ion_number));
+
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_expected));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_expected));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+}
