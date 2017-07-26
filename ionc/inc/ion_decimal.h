@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2011-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -10,6 +10,23 @@
  * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
  * language governing permissions and limitations under the License.
+ */
+
+/**
+ * This module provides routines for working with arbitrary-precision decimal numbers in accordance with the decimal
+ * data model defined in the Ion Specification.
+ *
+ * For computational APIs, the output parameter (usually the first) is considered to be an uninitialized value (i.e.
+ * no effort is made to free its associated memory before overwriting it) UNLESS it is the same reference as one of
+ * the operands. If it is the same reference as one of its operands, the operation will be performed in-place if
+ * possible. If not possible, its memory will be freed (if necessary) and replaced with newly allocated memory to hold
+ * the result.
+ *
+ * APIs without documentation within this file are shims to counterparts within the decNumber library. These
+ * counterparts are named dec[Number|Quad]<X>, where X is the camelCased function name without the `ion_decimal_`
+ * prefix. Detailed documentation for those APIs can be found within the decNumber library.
+ *
+ * To avoid memory leaks, `ion_decimal_release` should be called on all ION_DECIMALs before they go out of scope.
  */
 
 #ifndef ION_DECIMAL_H_
@@ -28,14 +45,9 @@
 extern "C" {
 #endif
 
-/**
- * TODO expand this general info section
- * For calculation APIs, the output parameter (usually the first) is considered to be an uninitialized value (i.e.
- * no effort is made to free its associated memory before overwriting it) UNLESS it is the same reference as one of
- * the operands. If it is the same reference as one of its operands, the operation will be performed in-place if
- * possible. If not possible, its memory will be freed and replaced with newly allocated memory to hold the result.
- * To avoid memory leaks, it is important not to reuse ION_DECIMAL values as output parameters unless it is an in-place
- * operation or the reused value has been uninitialized first using `ion_decimal_release`.
+
+/*
+ * Internal structure definitions. The internals should NOT be depended upon (or cared about) by the end user.
  */
 
 /**
@@ -68,17 +80,22 @@ struct _ion_decimal {
     } value;
 };
 
-//
-// support routines for decimal and timestamp values
-//
-ION_API_EXPORT iERR ion_decimal_set_to_double_value(decQuad *dec, double value, int32_t sig_digits);
-ION_API_EXPORT iERR ion_decimal_get_double_value   (decQuad *dec, double *p_value);
+
+/* Memory management */
 
 /**
- * If necessary, copies the given decimal's internal data so that owner of that data may be closed. This is useful,
- * for example, when it is necessary to keep the value in scope after the reader that produced it is closed. Once this
- * function has been called on a value, `ion_decimal_release` must be called on the same value to free the copied
- * memory.
+ * Zeroes the given ION_DECIMAL in-place. NOTE: this has better performance than memset in certain environments.
+ *
+ * @param value - the value to zero.
+ * @return IERR_OK (no errors are possible).
+ */
+ION_API_EXPORT iERR ion_decimal_zero(ION_DECIMAL *value);
+
+/**
+ * If necessary, copies the given decimal's internal data so that owner of that data may safely go out of scope. This is
+ * useful, for example, when it is necessary to keep the value in scope after the reader that produced it is closed.
+ * Values produced through calls to `ion_decimal_*` APIs (with the possible exception of `ion_decimal_from_number`) do
+ * NOT need to be claimed.
  *
  * @param value - The value to claim.
  */
@@ -91,23 +108,12 @@ ION_API_EXPORT iERR ion_decimal_claim(ION_DECIMAL *value);
  */
 ION_API_EXPORT iERR ion_decimal_release(ION_DECIMAL *value);
 
-/**
- * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
- * equivalent for the normalized values (even for zero).
- *
- * @deprecated - use of decQuads directly is deprecated. ION_DECIMAL should be used. See `ion_decimal_equals`.
- */
-ION_API_EXPORT iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
 
-/**
- * Compares ION_DECIMALs for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
- * equivalent for the normalized values (even for zero).
- */
-ION_API_EXPORT iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal);
+/* Conversions */
 
 /**
  * Converts the given ION_DECIMAL to a string. If the value has N decimal digits, the given string must have at least
- * N + 14 available bytes.
+ * N + 14 bytes available.
  *
  * @return IERR_OK (no errors are possible).
  */
@@ -126,16 +132,14 @@ ION_API_EXPORT iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_stri
 ION_API_EXPORT iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context);
 
 /**
- * Represents the given uint32 as an ION_DECIMAL. This function has no side effects that cause the resulting ION_DECIMAL
- * to need to be claimed or released.
+ * Represents the given uint32 as an ION_DECIMAL.
  *
  * @return IERR_OK (no errors are possible).
  */
 ION_API_EXPORT iERR ion_decimal_from_uint32(ION_DECIMAL *value, uint32_t num);
 
 /**
- * Represents the given int32 as an ION_DECIMAL. This function has no side effects that cause the resulting ION_DECIMAL
- * to need to be claimed or released.
+ * Represents the given int32 as an ION_DECIMAL.
  *
  * @return IERR_OK (no errors are possible).
  */
@@ -143,15 +147,13 @@ ION_API_EXPORT iERR ion_decimal_from_int32(ION_DECIMAL *value, int32_t num);
 
 /**
  * Represents the given decQuad as an ION_DECIMAL. The caller IS NOT required to keep the given decQuad in scope for the
- * lifetime of the resulting ION_DECIMAL. This function has no side effects that cause the resulting ION_DECIMAL
- * to need to be claimed or released.
+ * lifetime of the resulting ION_DECIMAL.
  *
  * @return IERR_OK (no errors are possible).
  */
 ION_API_EXPORT iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad);
 
 /**
- *
  * Represents the given decNumber as an ION_DECIMAL. This function does not allocate or copy any memory, so the caller
  * IS required to keep the given decNumber in scope for the lifetime of the resulting ION_DECIMAL. If desired, the
  * caller can alleviate this requirement by calling `ion_decimal_claim` on the resulting ION_DECIMAL (note that this
@@ -162,11 +164,23 @@ ION_API_EXPORT iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad);
  */
 ION_API_EXPORT iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *number);
 
-ION_API_EXPORT iERR ion_decimal_from_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int);
+/**
+ * Converts the given ION_INT to its ION_DECIMAL representation.
+ */
+ION_API_EXPORT iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *p_int);
+
+/**
+ * Converts the given ION_DECIMAL to its ION_INT representation. If the given ION_DECIMAL is not an integer,
+ * IERR_INVALID_ARG will be returned; rounding will never occur. If rounding is desired, use
+ * `ion_decimal_to_integral_exact` or `ion_decimal_to_integral_value` first.
+ */
+ION_API_EXPORT iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int);
 
 ION_API_EXPORT iERR ion_decimal_to_int32(const ION_DECIMAL *value, decContext *context, int32_t *p_int);
 ION_API_EXPORT iERR ion_decimal_to_uint32(const ION_DECIMAL *value, decContext *context, uint32_t *p_int);
-ION_API_EXPORT iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int);
+
+
+/* Operator APIs (computational) */
 
 ION_API_EXPORT iERR ion_decimal_fma(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, const ION_DECIMAL *fhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_add(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
@@ -187,8 +201,6 @@ ION_API_EXPORT iERR ion_decimal_scaleb(ION_DECIMAL *value, const ION_DECIMAL *lh
 ION_API_EXPORT iERR ion_decimal_shift(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_subtract(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_xor(ION_DECIMAL *value, const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context);
-ION_API_EXPORT iERR ion_decimal_zero(ION_DECIMAL *value);
-
 ION_API_EXPORT iERR ion_decimal_abs(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_invert(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_logb(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
@@ -198,16 +210,12 @@ ION_API_EXPORT iERR ion_decimal_reduce(ION_DECIMAL *value, const ION_DECIMAL *rh
 ION_API_EXPORT iERR ion_decimal_to_integral_exact(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 ION_API_EXPORT iERR ion_decimal_to_integral_value(ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context);
 
-ION_API_EXPORT iERR ion_decimal_canonical(ION_DECIMAL *value, const ION_DECIMAL *rhs);
-ION_API_EXPORT iERR ion_decimal_copy(ION_DECIMAL *value, const ION_DECIMAL *rhs);
-ION_API_EXPORT iERR ion_decimal_copy_abs(ION_DECIMAL *value, const ION_DECIMAL *rhs);
-ION_API_EXPORT iERR ion_decimal_copy_negate(ION_DECIMAL *value, const ION_DECIMAL *rhs);
-ION_API_EXPORT iERR ion_decimal_copy_sign(ION_DECIMAL *value, const ION_DECIMAL *rhs, const ION_DECIMAL *lhs, decContext *context);
+
+/* Utility APIs (non-computational) */
 
 ION_API_EXPORT uint32_t ion_decimal_digits(const ION_DECIMAL *value);
 ION_API_EXPORT int32_t ion_decimal_get_exponent(const ION_DECIMAL *value);
 ION_API_EXPORT uint32_t ion_decimal_radix(const ION_DECIMAL *value);
-
 ION_API_EXPORT uint32_t ion_decimal_same_quantum(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs);
 ION_API_EXPORT uint32_t ion_decimal_is_integer(const ION_DECIMAL *value);
 ION_API_EXPORT uint32_t ion_decimal_is_subnormal(const ION_DECIMAL *value, decContext *context);
@@ -219,6 +227,29 @@ ION_API_EXPORT uint32_t ion_decimal_is_negative(const ION_DECIMAL *value);
 ION_API_EXPORT uint32_t ion_decimal_is_zero(const ION_DECIMAL *value);
 ION_API_EXPORT uint32_t ion_decimal_is_canonical(const ION_DECIMAL *value);
 
+/* Comparisons */
+
+/**
+ * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
+ * equivalent for the normalized values (even for zero).
+ *
+ * @deprecated - use of decQuads directly is deprecated. ION_DECIMAL should be used. See `ion_decimal_equals`.
+ */
+ION_API_EXPORT iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal);
+
+/**
+ * Compares ION_DECIMALs for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
+ * equivalent for the normalized values (even for zero).
+ */
+ION_API_EXPORT iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal);
+
+/* Copies */
+
+ION_API_EXPORT iERR ion_decimal_canonical(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_abs(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_negate(ION_DECIMAL *value, const ION_DECIMAL *rhs);
+ION_API_EXPORT iERR ion_decimal_copy_sign(ION_DECIMAL *value, const ION_DECIMAL *rhs, const ION_DECIMAL *lhs, decContext *context);
 
 #ifdef __cplusplus
 }
