@@ -1648,7 +1648,7 @@ iERR _ion_writer_write_one_value_helper(ION_WRITER *pwriter, ION_READER *preader
     case (intptr_t)tid_DECIMAL:
         IONCHECK(_ion_reader_read_ion_decimal_helper(preader, &decimal_value));
         IONCHECK(_ion_writer_write_ion_decimal_helper(pwriter, &decimal_value));
-        IONCHECK(ion_decimal_release(&decimal_value));
+        IONCHECK(ion_decimal_free(&decimal_value));
         break;
     case (intptr_t)tid_TIMESTAMP:
         IONCHECK(_ion_reader_read_timestamp_helper(preader, &timestamp_value));

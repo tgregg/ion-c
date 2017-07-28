@@ -18,15 +18,17 @@
  *
  * For computational APIs, the output parameter (usually the first) is considered to be an uninitialized value (i.e.
  * no effort is made to free its associated memory before overwriting it) UNLESS it is the same reference as one of
- * the operands. If it is the same reference as one of its operands, the operation will be performed in-place if
+ * the operands. If it is the same reference as one of the operands, the operation will be performed in-place if
  * possible. If not possible, its memory will be freed (if necessary) and replaced with newly allocated memory to hold
- * the result.
+ * the result. This means that it is important not to reuse ION_DECIMAL instances as output parameters for non-in-place
+ * operations without freeing them using `ion_decimal_free` first. Doing so could result in a memory leak.
  *
  * APIs without documentation within this file are shims to counterparts within the decNumber library. These
  * counterparts are named dec[Number|Quad]<X>, where X is the camelCased function name without the `ion_decimal_`
  * prefix. Detailed documentation for those APIs can be found within the decNumber library.
  *
- * To avoid memory leaks, `ion_decimal_release` should be called on all ION_DECIMALs before they go out of scope.
+ * To avoid memory leaks, `ion_decimal_free` should be called on all ION_DECIMALs before they go out of scope AND before
+ * they are overwritten by non-in-place operations.
  */
 
 #ifndef ION_DECIMAL_H_
@@ -116,9 +118,9 @@ ION_API_EXPORT iERR ion_decimal_claim(ION_DECIMAL *value);
 /**
  * Frees any memory that was allocated when constructing this value. This should be called to clean up all ION_DECIMALs.
  *
- * @param value - The value to release.
+ * @param value - The value to free.
  */
-ION_API_EXPORT iERR ion_decimal_release(ION_DECIMAL *value);
+ION_API_EXPORT iERR ion_decimal_free(ION_DECIMAL *value);
 
 
 /* Conversions */
@@ -170,7 +172,7 @@ ION_API_EXPORT iERR ion_decimal_from_quad(ION_DECIMAL *value, decQuad *quad);
  * IS required to keep the given decNumber in scope for the lifetime of the resulting ION_DECIMAL. If desired, the
  * caller can alleviate this requirement by calling `ion_decimal_claim` on the resulting ION_DECIMAL (note that this
  * forces a copy). It is the caller's responsibility to eventually free any dynamically allocated memory used by the
- * given decNumber (calling `ion_decimal_release` will not free this memory).
+ * given decNumber (calling `ion_decimal_free` will not free this memory).
  *
  * @return IERR_OK (no errors are possible).
  */

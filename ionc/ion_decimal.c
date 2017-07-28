@@ -85,7 +85,7 @@ iERR ion_decimal_claim(ION_DECIMAL *value) {
             break;
         case ION_DECIMAL_TYPE_NUMBER_OWNED:
             // The decNumber may have been allocated with an owner, meaning its memory will go out of scope when that
-            // owner is closed. This copy extends that scope until ion_decimal_release.
+            // owner is closed. This copy extends that scope until ion_decimal_free.
             IONCHECK(_ion_decimal_number_alloc(NULL, ION_DECIMAL_AS_NUMBER(value)->digits, &copy));
             decNumberCopy(copy, ION_DECIMAL_AS_NUMBER(value));
             ION_DECIMAL_AS_NUMBER(value) = copy;
@@ -97,7 +97,7 @@ iERR ion_decimal_claim(ION_DECIMAL *value) {
     iRETURN;
 }
 
-iERR ion_decimal_release(ION_DECIMAL *value) {
+iERR ion_decimal_free(ION_DECIMAL *value) {
     iENTER;
     switch (value->type) {
         case ION_DECIMAL_TYPE_NUMBER:
@@ -335,7 +335,7 @@ iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *
     IONCHECK(_ion_decimal_number_alloc(NULL, context->digits, &temp)); \
     calculate; \
     if (calculate_operand_mask) { \
-        IONCHECK(ion_decimal_release(value)); \
+        IONCHECK(ion_decimal_free(value)); \
     } \
     ION_DECIMAL_AS_NUMBER(value) = temp; \
     value->type = ION_DECIMAL_TYPE_NUMBER;

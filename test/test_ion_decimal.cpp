@@ -51,8 +51,8 @@ TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
                                                 << std::string((char *)result, result_len);
     assertStringsEqual(text_decimal, (char *)result, result_len);
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_1));
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_2));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_1));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_2));
 }
 
 TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
@@ -81,7 +81,7 @@ TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
     ASSERT_EQ(tid_DECIMAL, type);
     ASSERT_EQ(IERR_NUMERIC_OVERFLOW, ion_reader_read_ion_decimal(reader, &ion_decimal));
     ION_ASSERT_OK(ion_reader_close(reader));
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal));
 }
 
 TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
@@ -157,7 +157,7 @@ TEST(IonTextDecimal, ReaderAlwaysPreservesUpTo34Digits) {
                                                 << std::string((char *)result, result_len);
     assertStringsEqual(text_decimal, (char *)result, result_len);
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal));
 }
 
 TEST(IonDecimal, WriteAllValues) {
@@ -180,7 +180,7 @@ TEST(IonDecimal, WriteAllValues) {
     ION_ASSERT_OK(ion_reader_close(reader));
     assertStringsEqual(text_decimals, (char *)result, result_len);
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal));
 }
 
 TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
@@ -217,8 +217,8 @@ TEST(IonBinaryDecimal, RoundtripPreservesFullFidelityDecNumber) {
 
     ASSERT_TRUE(equals);
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_before));
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_after));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_before));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_after));
 }
 
 TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
@@ -268,7 +268,7 @@ TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
     ION_ASSERT_OK(ion_reader_close(reader));
 
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal));
 }
 
 TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
@@ -319,7 +319,7 @@ TEST(IonBinaryDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
     ION_ASSERT_OK(ion_reader_close(reader));
 
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal));
 }
 
 TEST(IonBinaryDecimal, ReaderAlwaysPreservesUpTo34Digits) {
@@ -383,8 +383,8 @@ TEST(IonBinaryDecimal, ReaderAlwaysPreservesUpTo34Digits) {
     ASSERT_TRUE(decimal_equals);
     ASSERT_TRUE(quad_equals);
     free(result);
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_before));
-    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_after));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_before));
+    ION_ASSERT_OK(ion_decimal_free(&ion_decimal_after));
 }
 
 TEST(IonDecimal, FMADecQuad) {
@@ -397,11 +397,11 @@ TEST(IonDecimal, FMADecQuad) {
     ION_ASSERT_OK(ion_decimal_from_int32(&expected, 101));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result));
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMADecQuadInPlaceAllOperandsSame) {
@@ -412,8 +412,8 @@ TEST(IonDecimal, FMADecQuadInPlaceAllOperandsSame) {
     ION_ASSERT_OK(ion_decimal_from_int32(&expected, 110));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMADecNumber) {
@@ -426,11 +426,11 @@ TEST(IonDecimal, FMADecNumber) {
     ION_ASSERT_OK(ion_decimal_from_string(&expected, "10000000000000000000000000000000000000100000000000000000000000000000000000000.", &g_TestDecimalContext));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result));
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMAMixed) {
@@ -448,11 +448,11 @@ TEST(IonDecimal, FMAMixed) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMAMixedInPlaceNumber) {
@@ -470,10 +470,10 @@ TEST(IonDecimal, FMAMixedInPlaceNumber) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMAMixedInPlaceQuad) {
@@ -491,10 +491,10 @@ TEST(IonDecimal, FMAMixedInPlaceQuad) {
     ASSERT_EQ(ION_DECIMAL_TYPE_NUMBER, lhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMADecQuadOverflows) {
@@ -516,11 +516,11 @@ TEST(IonDecimal, FMADecQuadOverflows) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMADecQuadOverflowsInPlace) {
@@ -541,10 +541,10 @@ TEST(IonDecimal, FMADecQuadOverflowsInPlace) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, fhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&fhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&fhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, FMADecQuadOverflowsTwoOperandsSameAsOutput) {
@@ -563,9 +563,9 @@ TEST(IonDecimal, FMADecQuadOverflowsTwoOperandsSameAsOutput) {
     // Asserts that the operation did not change the operands.
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddDecQuad) {
@@ -577,10 +577,10 @@ TEST(IonDecimal, AddDecQuad) {
     ION_ASSERT_OK(ion_decimal_from_int32(&expected, 10));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result));
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddDecNumber) {
@@ -592,10 +592,10 @@ TEST(IonDecimal, AddDecNumber) {
     ION_ASSERT_OK(ion_decimal_from_string(&expected, "200000000000000000000000000000000000002.", &g_TestDecimalContext));
     ASSERT_TRUE(assertIonDecimalEq(&expected, &result));
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddMixed) {
@@ -612,10 +612,10 @@ TEST(IonDecimal, AddMixed) {
     // Asserts that the operation did not change the operands.
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddDecQuadOverflows) {
@@ -635,10 +635,10 @@ TEST(IonDecimal, AddDecQuadOverflows) {
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&result));
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&result));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddDecQuadOverflowsInPlace) {
@@ -657,9 +657,9 @@ TEST(IonDecimal, AddDecQuadOverflowsInPlace) {
     // Asserts that the operation did not change the operands.
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, rhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, AddDecQuadInPlaceAllOperandsSame) {
@@ -670,8 +670,8 @@ TEST(IonDecimal, AddDecQuadInPlaceAllOperandsSame) {
     ASSERT_TRUE(assertIonDecimalEq(&expected, &lhs));
     ASSERT_EQ(ION_DECIMAL_TYPE_QUAD, lhs.type);
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&expected));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&expected));
 }
 
 TEST(IonDecimal, EqualsWithMixedOperands) {
@@ -691,8 +691,8 @@ TEST(IonDecimal, EqualsWithMixedOperands) {
     ASSERT_TRUE(assertIonDecimalEq(&rhs, &rhs));
     ASSERT_TRUE(assertIonDecimalEq(&lhs, &lhs));
 
-    ION_ASSERT_OK(ion_decimal_release(&lhs));
-    ION_ASSERT_OK(ion_decimal_release(&rhs));
+    ION_ASSERT_OK(ion_decimal_free(&lhs));
+    ION_ASSERT_OK(ion_decimal_free(&rhs));
 }
 
 TEST(IonDecimal, IsNegative) {
@@ -715,10 +715,10 @@ TEST(IonDecimal, IsNegative) {
     ASSERT_FALSE(ion_decimal_is_negative(&ion_number_positive));
     ASSERT_FALSE(ion_decimal_is_negative(&ion_quad_positive));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_negative));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_negative));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_positive));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_negative));
 }
 
 TEST(IonDecimal, AbsQuad) {
@@ -737,9 +737,9 @@ TEST(IonDecimal, AbsQuad) {
     ASSERT_TRUE(assertIonDecimalEq(&ion_quad_positive, &ion_quad_negative));
     ASSERT_TRUE(assertIonDecimalEq(&ion_quad_positive, &ion_quad_positive_result));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_positive_result));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_positive));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_negative));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_positive_result));
 }
 
 TEST(IonDecimal, AbsNumber) {
@@ -758,9 +758,9 @@ TEST(IonDecimal, AbsNumber) {
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_negative));
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_positive_result));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_negative));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive_result));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_negative));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_positive_result));
 }
 
 TEST(IonDecimal, CopySign) {
@@ -773,9 +773,9 @@ TEST(IonDecimal, CopySign) {
     ION_ASSERT_OK(ion_decimal_minus(&ion_number_result, &ion_number_result, &g_TestDecimalContext));
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_positive, &ion_number_result));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_positive));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_negative));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_positive));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_negative));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_result));
 }
 
 TEST(IonDecimal, ToIntegralValue) {
@@ -790,11 +790,11 @@ TEST(IonDecimal, ToIntegralValue) {
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number_result));
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_expected));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_expected));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_expected));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_expected));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_result));
 }
 
 TEST(IonDecimal, ToIntegralValueRounded) {
@@ -809,11 +809,11 @@ TEST(IonDecimal, ToIntegralValueRounded) {
     ASSERT_TRUE(assertIonDecimalEq(&ion_number_expected, &ion_number_result));
     ASSERT_FALSE(assertIonDecimalEq(&ion_number_expected, &ion_number));
 
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_expected));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_expected));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_expected));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_expected));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_result));
 }
 
 TEST(IonDecimal, ToAndFromString) {
@@ -851,10 +851,10 @@ TEST(IonDecimal, ToAndFromString) {
     free(quad_str);
     free(small_str);
     free(large_str);
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_small));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_large));
-    ION_ASSERT_OK(ion_decimal_release(&ion_quad_after));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_small_after));
-    ION_ASSERT_OK(ion_decimal_release(&ion_number_large_after));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_small));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_large));
+    ION_ASSERT_OK(ion_decimal_free(&ion_quad_after));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_small_after));
+    ION_ASSERT_OK(ion_decimal_free(&ion_number_large_after));
 }

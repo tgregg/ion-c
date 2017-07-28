@@ -71,7 +71,7 @@ IonEventStream::~IonEventStream() {
                         ion_int_free((ION_INT *)event->value);
                         break;
                     case tid_DECIMAL_INT:
-                        ion_decimal_release((ION_DECIMAL *)event->value);
+                        ion_decimal_free((ION_DECIMAL *) event->value);
                         break;
                     case tid_SYMBOL_INT:
                     case tid_STRING_INT:
