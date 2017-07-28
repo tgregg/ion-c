@@ -116,32 +116,27 @@ iERR ion_decimal_release(ION_DECIMAL *value) {
 
 /* Conversions */
 
-iERR _ion_decimal_from_string_helper(char *str, decContext *context, hOWNER owner, decQuad *p_quad, decNumber **p_num) {
+iERR _ion_decimal_from_string_helper(const char *str, decContext *context, hOWNER owner, decQuad *p_quad, decNumber **p_num) {
     iENTER;
-    char            *cp, c_save = 0;
-    uint32_t        saved_status;
-    SIZE            decimal_digits = 0;
+    const char *cp;
+    uint32_t   saved_status;
+    SIZE       decimal_digits = 0;
 
-    for (cp = str; *cp; cp++) {
-        if (*cp == 'd' || *cp == 'D') {
-            c_save = *cp;
-            *cp = 'e';
-            break;
-        }
-        if (*cp != '.') {
-            decimal_digits++;
-        }
-    }
-    // Replace 'd' with 'e' to satisfy the decNumber APIs.
-    if (*cp) {
-        c_save = *cp;
-        *cp = 'e';
-    }
-    saved_status = decContextSaveStatus(context, DEC_Inexact);
-    decContextClearStatus(context, DEC_Inexact);
+    // NOTE: decFloatFromString and decNumberFromString have been modified to accept both 'e' and 'd'. If the decNumber
+    // implementation is updated or swapped out, arrangements need to be made here (or there) to ensure this function
+    // can parse exponents denoted by either 'e' or 'd'.
+    ION_DECIMAL_SAVE_STATUS(saved_status, context, DEC_Inexact);
     decQuadFromString(p_quad, str, context);
     if (decContextTestStatus(context, DEC_Inexact)) {
         if (p_num) {
+            for (cp = str; *cp; cp++) {
+                if (*cp == 'd' || *cp == 'D' || *cp == 'e' || *cp == 'E') {
+                    break;
+                }
+                if (*cp != '.') {
+                    decimal_digits++;
+                }
+            }
             decContextClearStatus(context, DEC_Inexact);
             IONCHECK(_ion_decimal_number_alloc(owner, decimal_digits, p_num));
             decNumberFromString(*p_num, str, context);
@@ -157,15 +152,11 @@ iERR _ion_decimal_from_string_helper(char *str, decContext *context, hOWNER owne
         }
     }
     decContextRestoreStatus(context, saved_status, DEC_Inexact);
-    // restore the string is we munged it, just in case someone else wants to use if later
-    if (*cp) {
-        *cp = c_save;
-    }
 
     iRETURN;
 }
 
-iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context) {
+iERR ion_decimal_from_string(ION_DECIMAL *value, const char *str, decContext *context) {
     iENTER;
     decNumber *num_value = NULL;
     IONCHECK(_ion_decimal_from_string_helper(str, context, NULL, ION_DECIMAL_AS_QUAD(value), &num_value));
@@ -177,6 +168,53 @@ iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context)
         value->type = ION_DECIMAL_TYPE_QUAD;
     }
     iRETURN;
+}
+
+void _ion_decimal_to_string_to_ion(char *p_string) {
+    char *exp, *dec;
+    exp = strchr(p_string, 'E');
+    dec = strchr(p_string, '.');
+    if (exp) *exp = 'd';
+    if (!dec && !exp) {
+        strcat(p_string, "d0");
+    }
+}
+
+#define ION_DECIMAL_TO_STRING_HELPER(is_signed, is_infinite, is_nan, is_zero, digits, to_string) \
+    iENTER; \
+    ASSERT(value); \
+    BOOL is_negative = is_signed(value); \
+    if (is_infinite(value)) { \
+        strcpy(p_string, is_negative ? "-inf" : "+inf"); \
+    } \
+    else if (is_nan(value)) { \
+        strcpy(p_string, "nan"); \
+    } \
+    else if (is_zero(value) && !is_negative && digits != 1) { \
+        strcpy(p_string, "0d0"); \
+    } \
+    else { \
+        to_string(value, p_string); \
+        _ion_decimal_to_string_to_ion(p_string); \
+    } \
+    iRETURN; \
+
+iERR _ion_decimal_to_string_quad_helper(const decQuad *value, char *p_string) {
+    ION_DECIMAL_TO_STRING_HELPER(decQuadIsSigned, decQuadIsInfinite, decQuadIsNaN,
+                                 decQuadIsZero, decQuadDigits(value), decQuadToString);
+}
+
+iERR _ion_decimal_to_string_number_helper(const decNumber *value, char *p_string) {
+    ION_DECIMAL_TO_STRING_HELPER(decNumberIsNegative, decNumberIsInfinite, decNumberIsNaN,
+                                 decNumberIsZero, value->digits, decNumberToString);
+}
+
+iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
+    ION_DECIMAL_API(
+        value,
+        IONCHECK(_ion_decimal_to_string_quad_helper(quad_value, p_string)),
+        IONCHECK(_ion_decimal_to_string_number_helper(num_value, p_string))
+    );
 }
 
 iERR ion_decimal_from_uint32(ION_DECIMAL *value, uint32_t num) {
@@ -207,17 +245,12 @@ iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *number) {
     iRETURN;
 }
 
-iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
-    ION_DECIMAL_API(value, decQuadToString(quad_value, p_string), decNumberToString(num_value, p_string));
-}
-
 #define ION_DECIMAL_CONVERSION_API(name, type, if_quad, if_number) \
 iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
     iENTER; \
     uint32_t status; \
     ASSERT(p_out); \
-    status = decContextSaveStatus(context, DEC_Inexact | DEC_Invalid_operation); \
-    decContextClearStatus(context, DEC_Inexact | DEC_Invalid_operation); \
+    ION_DECIMAL_SAVE_STATUS(status, context, (DEC_Inexact | DEC_Invalid_operation)); \
     ION_DECIMAL_IF_QUAD(value) { \
         *p_out = if_quad(quad_value, context, context->round); \
     } \
@@ -225,13 +258,7 @@ iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
         *p_out = if_number(num_value, context); \
     } \
     ION_DECIMAL_ENDIF; \
-    if (decContextTestStatus(context, DEC_Inexact)) { \
-        err = IERR_NUMERIC_OVERFLOW; \
-    } \
-    if (decContextTestStatus(context, DEC_Invalid_operation)) { \
-        err = IERR_INVALID_ARG; \
-    } \
-    decContextRestoreStatus(context, status, DEC_Inexact | DEC_Invalid_operation); \
+    ION_DECIMAL_TEST_AND_RESTORE_STATUS(status, context, (DEC_Inexact | DEC_Invalid_operation)); \
     iRETURN; \
 }
 
@@ -300,7 +327,7 @@ iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *
     }
 
 #define ION_DECIMAL_RESTORE_QUAD_THREE_OPERAND \
-    ION_DECIMAL_RESTORE_QUAD_TWO_OPERAND \
+    ION_DECIMAL_RESTORE_QUAD_TWO_OPERAND; \
     if (operand_mask & ION_DECIMAL_FHS_BIT) { \
         decQuadCopy(ION_DECIMAL_AS_QUAD(fhs), &temp); \
     }
@@ -316,8 +343,7 @@ iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *
     value->type = ION_DECIMAL_TYPE_NUMBER;
 
 #define ION_DECIMAL_QUAD_CALCULATE(calculate, on_overflow, recalculate) \
-    status = decContextSaveStatus(context, DEC_Inexact); \
-    decContextClearStatus(context, DEC_Inexact); \
+    ION_DECIMAL_SAVE_STATUS(status, context, DEC_Inexact); \
     calculate; \
     value->type = ION_DECIMAL_TYPE_QUAD; \
     if (decContextTestStatus(context, DEC_Inexact)) { \

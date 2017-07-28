@@ -41,6 +41,18 @@
     #error DECNUMDIGITS must be defined to be >= DECQUAD_Pmax
 #endif
 
+/**
+ * Provides the byte size required to hold the string representation of the given decimal.
+ */
+#define ION_DECIMAL_STRLEN(ion_decimal) \
+    ((size_t)(((ion_decimal)->type == ION_DECIMAL_TYPE_QUAD) \
+        ? DECQUAD_String \
+        : (((ion_decimal)->type == ION_DECIMAL_TYPE_UNKNOWN) \
+            ? -1 \
+            : ((ion_decimal)->value.num_value->digits + 14) /* +14 is specified by decNumberToString. */ \
+        ) \
+    ))
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -112,8 +124,8 @@ ION_API_EXPORT iERR ion_decimal_release(ION_DECIMAL *value);
 /* Conversions */
 
 /**
- * Converts the given ION_DECIMAL to a string. If the value has N decimal digits, the given string must have at least
- * N + 14 bytes available.
+ * Converts the given ION_DECIMAL to a string. `ION_DECIMAL_STRLEN` may be used to determine the amount of space
+ * required to hold the string representation.
  *
  * @return IERR_OK (no errors are possible).
  */
@@ -129,7 +141,7 @@ ION_API_EXPORT iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_stri
  *   is raised.
  * @return IERR_NUMERIC_OVERFLOW if the decimal lies outside of the context's limits, otherwise IERR_OK.
  */
-ION_API_EXPORT iERR ion_decimal_from_string(ION_DECIMAL *value, char *str, decContext *context);
+ION_API_EXPORT iERR ion_decimal_from_string(ION_DECIMAL *value, const char *str, decContext *context);
 
 /**
  * Represents the given uint32 as an ION_DECIMAL.

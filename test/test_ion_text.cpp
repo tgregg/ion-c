@@ -13,7 +13,6 @@
  */
 
 #include <decNumber.h>
-#include <inc/ion_decimal.h>
 #include "ion_assert.h"
 #include "ion_helpers.h"
 #include "ion_test_util.h"

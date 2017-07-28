@@ -469,3 +469,46 @@ TEST(IonDecimal, ToIntegralValueRounded) {
     ION_ASSERT_OK(ion_decimal_release(&ion_number_expected));
     ION_ASSERT_OK(ion_decimal_release(&ion_number_result));
 }
+
+TEST(IonDecimal, ToAndFromString) {
+    ION_DECIMAL ion_quad, ion_number_small, ion_number_large;
+    ION_DECIMAL ion_quad_after, ion_number_small_after, ion_number_large_after;
+    char *quad_str, *small_str, *large_str;
+    decQuad quad;
+    decNumber number_small;
+    decQuadZero(&quad);
+    ION_ASSERT_OK(ion_decimal_from_quad(&ion_quad, &quad));
+    decNumberZero(&number_small);
+    ION_ASSERT_OK(ion_decimal_from_number(&ion_number_small, &number_small));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_large, "-999999999999999999999999999999999999999999.999d-3", &g_TestDecimalContext));
+
+    ASSERT_EQ(DECQUAD_String, ION_DECIMAL_STRLEN(&ion_quad));
+    ASSERT_EQ(1 + 14, ION_DECIMAL_STRLEN(&ion_number_small));
+    ASSERT_EQ(45 + 14, ION_DECIMAL_STRLEN(&ion_number_large));
+
+    quad_str = (char *)malloc(ION_DECIMAL_STRLEN(&ion_quad));
+    small_str = (char *)malloc(ION_DECIMAL_STRLEN(&ion_number_small));
+    large_str = (char *)malloc(ION_DECIMAL_STRLEN(&ion_number_large));
+
+    ION_ASSERT_OK(ion_decimal_to_string(&ion_quad, quad_str));
+    ION_ASSERT_OK(ion_decimal_to_string(&ion_number_small, small_str));
+    ION_ASSERT_OK(ion_decimal_to_string(&ion_number_large, large_str));
+
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_quad_after, quad_str, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_small_after, small_str, &g_TestDecimalContext));
+    ION_ASSERT_OK(ion_decimal_from_string(&ion_number_large_after, large_str, &g_TestDecimalContext));
+
+    ASSERT_TRUE(assertIonDecimalEq(&ion_quad, &ion_quad_after));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_small, &ion_number_small_after));
+    ASSERT_TRUE(assertIonDecimalEq(&ion_number_large, &ion_number_large_after));
+
+    free(quad_str);
+    free(small_str);
+    free(large_str);
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_small));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_large));
+    ION_ASSERT_OK(ion_decimal_release(&ion_quad_after));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_small_after));
+    ION_ASSERT_OK(ion_decimal_release(&ion_number_large_after));
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2011-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -27,12 +27,25 @@
 
 #define ION_DECIMAL_IS_NUMBER(dec) (dec->type == ION_DECIMAL_TYPE_NUMBER || dec->type == ION_DECIMAL_TYPE_NUMBER_OWNED)
 
+#define ION_DECIMAL_SAVE_STATUS(decimal_status, decimal_context, status_flags) \
+    decimal_status = decContextSaveStatus(decimal_context, status_flags); \
+    decContextClearStatus(decimal_context, status_flags);
+
+#define ION_DECIMAL_TEST_AND_RESTORE_STATUS(decimal_status, decimal_context, status_flags) \
+    if (decContextTestStatus(decimal_context, status_flags)) { \
+        /* Status failure occurred; fail loudly. */ \
+        FAILWITH(IERR_NUMERIC_OVERFLOW); \
+    } \
+    decContextRestoreStatus(decimal_context, decimal_status, status_flags);
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_number);
-iERR _ion_decimal_from_string_helper(char *str, decContext *context, hOWNER owner, decQuad *p_quad, decNumber **p_num);
+iERR _ion_decimal_from_string_helper(const char *str, decContext *context, hOWNER owner, decQuad *p_quad, decNumber **p_num);
+iERR _ion_decimal_to_string_quad_helper(const decQuad *value, char *p_string);
+iERR _ion_decimal_to_string_number_helper(const decNumber *value, char *p_string);
 
 #ifdef __cplusplus
 }

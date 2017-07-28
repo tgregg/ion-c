@@ -1549,7 +1549,7 @@ iERR _ion_writer_write_one_value_helper(ION_WRITER *pwriter, ION_READER *preader
     int32_t       count, ii;
     BOOL          is_null, bool_value, is_in_struct;
     double        double_value;
-    decQuad       decimal_value;
+    ION_DECIMAL   decimal_value;
     ION_TIMESTAMP timestamp_value;
 
 
@@ -1646,8 +1646,9 @@ iERR _ion_writer_write_one_value_helper(ION_WRITER *pwriter, ION_READER *preader
         IONCHECK(_ion_writer_write_double_helper(pwriter, double_value));
         break;
     case (intptr_t)tid_DECIMAL:
-        IONCHECK(_ion_reader_read_decimal_helper(preader, &decimal_value));
-        IONCHECK(_ion_writer_write_decimal_helper(pwriter, &decimal_value));
+        IONCHECK(_ion_reader_read_ion_decimal_helper(preader, &decimal_value));
+        IONCHECK(_ion_writer_write_ion_decimal_helper(pwriter, &decimal_value));
+        IONCHECK(ion_decimal_release(&decimal_value));
         break;
     case (intptr_t)tid_TIMESTAMP:
         IONCHECK(_ion_reader_read_timestamp_helper(preader, &timestamp_value));

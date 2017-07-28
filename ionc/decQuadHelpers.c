@@ -15,6 +15,7 @@
 // helper functions
 
 #include "ion_internal.h"
+#include "ion_decimal_impl.h"
 #include <math.h>
 
 // Max uint64_t is 18446744073709551615; decimal digits are retrieved 9 at a time.
@@ -80,8 +81,7 @@ iERR ion_quad_get_quad_from_digits_and_exponent(uint64_t value, int32_t exp,
 
     decQuadZero(&result);
 
-    saved_status = decContextSaveStatus(set, DEC_Inexact);
-    decContextClearStatus(set, DEC_Inexact);
+    ION_DECIMAL_SAVE_STATUS(saved_status, set, DEC_Inexact);
 
     decQuadFromInt32(&multiplier, 1);
     multiplier_exponent = 0;
@@ -110,11 +110,7 @@ iERR ion_quad_get_quad_from_digits_and_exponent(uint64_t value, int32_t exp,
     }
     decQuadSetExponent(&result, set, exp);
 
-    if (decContextTestStatus(set, DEC_Inexact)) {
-        // The value is too large to fit in a decQuad representation. Rather than silently losing precision, fail.
-        FAILWITH(IERR_NUMERIC_OVERFLOW);
-    }
-    decContextRestoreStatus(set, saved_status, DEC_Inexact);
+    ION_DECIMAL_TEST_AND_RESTORE_STATUS(saved_status, set, DEC_Inexact);
 
     decQuadCopy(p_quad, &result);
 

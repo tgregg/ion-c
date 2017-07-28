@@ -17,6 +17,7 @@
 //
 
 #include "ion_internal.h"
+#include "ion_decimal_impl.h"
 
 #ifdef ION_PLATFORM_ANDROID
 // Taken from http://www.kernel.org/doc/man-pages/online/pages/man3/timegm.3.html
@@ -532,8 +533,8 @@ iERR ion_timestamp_parse(ION_TIMESTAMP *ptime, char *buffer, SIZE buf_length, SI
         if (cp > end_of_buffer) FAILWITH(IERR_INVALID_TIMESTAMP);
 
         *dst = 0; // null terminate the string (it's why we copied it after all)
-        // TODO fail on DEC_Inexact?
-        decQuadFromString(&fraction, temp, pcontext); // TODO timestamp fraction as ION_DECIMAL to support full precision?
+        // TODO timestamp fraction as ION_DECIMAL to support full precision?
+        IONCHECK(_ion_decimal_from_string_helper(temp, pcontext, NULL, &fraction, NULL));
 
 
 end_of_time:
@@ -1289,7 +1290,6 @@ iERR ion_timestamp_binary_read(ION_STREAM *stream, int32_t len, decContext *cont
     if (len == 0) goto timestamp_is_finished;
 
     // now we read in our actual "milliseconds since the epoch"
-    // TODO fail on DEC_Inexact?
     IONCHECK(ion_binary_read_decimal(stream, len, context, &ptime->fraction, NULL)); // TODO make timestamp's fraction an ION_DECIMAL so it can support full precision?
     if (decQuadIsSigned(&ptime->fraction)) {
         if (decQuadIsZero(&ptime->fraction)) {

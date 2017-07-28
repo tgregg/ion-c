@@ -18,6 +18,7 @@
 //
 
 #include "ion_internal.h"
+#include "ion_decimal_impl.h"
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -523,8 +524,6 @@ iERR _ion_writer_text_write_decimal_quad(ION_WRITER *pwriter, decQuad *value)
 {
     iENTER;
     char image[DECQUAD_String];
-    char *dec, *exp, *start;
-    BOOL is_negative;
 
     if (!pwriter) FAILWITH(IERR_BAD_HANDLE);
 
@@ -536,27 +535,8 @@ iERR _ion_writer_text_write_decimal_quad(ION_WRITER *pwriter, decQuad *value)
         SUCCEED();
     }
 
-    is_negative = decQuadIsSigned(value);
-    if (decQuadIsInfinite(value)) {
-        start = is_negative ? "-inf" : "+inf";
-    }
-    else if (decQuadIsNaN(value)) {
-        start = "nan";
-    }
-    else if (decQuadIsZero(value) && !is_negative && decQuadDigits(value) != 1) {
-        start = "0d0";
-    }
-    else {
-        start = decQuadToString(value, image);
-        exp = strchr(image, 'E');
-        dec = strchr(image, '.');
-        if (exp) *exp = 'd';
-        if (!dec && !exp) {
-            strcat(image, "d+0");
-        }
-    }
-
-    IONCHECK(_ion_writer_text_append_ascii_cstr(pwriter->output, start));
+    IONCHECK(_ion_decimal_to_string_quad_helper(value, image));
+    IONCHECK(_ion_writer_text_append_ascii_cstr(pwriter->output, image));
     IONCHECK(_ion_writer_text_close_value(pwriter));
 
     iRETURN;
@@ -565,8 +545,7 @@ iERR _ion_writer_text_write_decimal_quad(ION_WRITER *pwriter, decQuad *value)
 iERR _ion_writer_text_write_decimal_number(ION_WRITER *pwriter, decNumber *value)
 {
     iENTER;
-    char *image, *dec, *exp, *start;
-    BOOL is_negative;
+    char *image;
 
     if (!pwriter) FAILWITH(IERR_BAD_HANDLE);
 
@@ -578,31 +557,13 @@ iERR _ion_writer_text_write_decimal_number(ION_WRITER *pwriter, decNumber *value
         SUCCEED();
     }
 
-    is_negative = decNumberIsNegative(value);
-    if (decNumberIsInfinite(value)) {
-        start = is_negative ? "-inf" : "+inf";
-    }
-    else if (decNumberIsNaN(value)) {
-        start = "nan";
-    }
-    else if (decNumberIsZero(value) && !is_negative && value->digits != 1) {
-        start = "0d0";
-    }
-    else {
-        image = ion_alloc_with_owner(pwriter, value->digits + 14); // +14 is specified by decNumberToString.
-        if (!image) {
-            FAILWITH(IERR_NO_MEMORY);
-        }
-        start = decNumberToString(value, image);
-        exp = strchr(image, 'E');
-        dec = strchr(image, '.');
-        if (exp) *exp = 'd';
-        if (!dec && !exp) {
-            strcat(image, "d+0");
-        }
+    image = ion_alloc_with_owner(pwriter, value->digits + 14); // +14 is specified by decNumberToString.
+    if (!image) {
+        FAILWITH(IERR_NO_MEMORY);
     }
 
-    IONCHECK(_ion_writer_text_append_ascii_cstr(pwriter->output, start));
+    IONCHECK(_ion_decimal_to_string_number_helper(value, image));
+    IONCHECK(_ion_writer_text_append_ascii_cstr(pwriter->output, image));
     IONCHECK(_ion_writer_text_close_value(pwriter));
 
     iRETURN;
