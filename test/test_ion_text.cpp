@@ -591,7 +591,9 @@ TEST(IonTextDecimal, ReaderPreservesFullFidelityDecNumber) {
     ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
                                                 << std::string((char *)result, result_len);
     assertStringsEqual(text_decimal, (char *)result, result_len);
-    free(result); // TODO wherever ion_test_writer_get_bytes is used, the result needs to be freed.
+    free(result);
+    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_1));
+    ION_ASSERT_OK(ion_decimal_release(&ion_decimal_2));
 }
 
 TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
@@ -620,6 +622,7 @@ TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecNumber) {
     ASSERT_EQ(tid_DECIMAL, type);
     ASSERT_EQ(IERR_NUMERIC_OVERFLOW, ion_reader_read_ion_decimal(reader, &ion_decimal));
     ION_ASSERT_OK(ion_reader_close(reader));
+    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
 }
 
 TEST(IonTextDecimal, ReaderFailsUponLossOfPrecisionDecQuad) {
@@ -694,5 +697,29 @@ TEST(IonTextDecimal, ReaderAlwaysPreservesUpTo34Digits) {
     ASSERT_EQ(strlen(text_decimal), result_len) << text_decimal << " vs. " << std::endl
                                                 << std::string((char *)result, result_len);
     assertStringsEqual(text_decimal, (char *)result, result_len);
-    free(result); // TODO wherever ion_test_writer_get_bytes is used, the result needs to be freed.
+    free(result);
+    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
+}
+
+TEST(IonDecimal, WriteAllValues) {
+    const char *text_decimals = "1.1999999999999999555910790149937383830547332763671875\n-1d+123";
+    hREADER reader;
+    ION_READER_OPTIONS options;
+    ION_DECIMAL ion_decimal;
+
+    hWRITER writer = NULL;
+    ION_STREAM *ion_stream = NULL;
+    BYTE *result;
+    SIZE result_len;
+
+    ion_test_initialize_reader_options(&options);
+    ION_ASSERT_OK(ion_reader_open_buffer(&reader, (BYTE *)text_decimals, strlen(text_decimals), &options));
+    ION_ASSERT_OK(ion_test_new_writer(&writer, &ion_stream, FALSE));
+    ION_ASSERT_OK(ion_writer_write_all_values(writer, reader));
+    ION_ASSERT_OK(ion_test_writer_get_bytes(writer, ion_stream, &result, &result_len));
+
+    ION_ASSERT_OK(ion_reader_close(reader));
+    assertStringsEqual(text_decimals, (char *)result, result_len);
+    free(result);
+    ION_ASSERT_OK(ion_decimal_release(&ion_decimal));
 }
