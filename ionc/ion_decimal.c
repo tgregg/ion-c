@@ -41,7 +41,7 @@ switch(ion_decimal->type) { \
         FAILWITH(IERR_INVALID_ARG); \
 }
 
-#define ION_DECIMAL_API(value, if_quad, if_number) \
+#define ION_DECIMAL_SWITCH(value, if_quad, if_number) \
 iENTER; \
 ION_DECIMAL_IF_QUAD(value) { \
     if_quad; \
@@ -70,7 +70,7 @@ iERR _ion_decimal_number_alloc(void *owner, SIZE decimal_digits, decNumber **p_n
 }
 
 iERR ion_decimal_zero(ION_DECIMAL *value) {
-    ION_DECIMAL_API(value, decQuadZero(quad_value), decNumberZero(num_value));
+    ION_DECIMAL_SWITCH(value, decQuadZero(quad_value), decNumberZero(num_value));
 }
 
 iERR ion_decimal_claim(ION_DECIMAL *value) {
@@ -178,7 +178,7 @@ void _ion_decimal_to_string_to_ion(char *p_string) {
     }
 }
 
-#define ION_DECIMAL_TO_STRING_HELPER(is_signed, is_infinite, is_nan, is_zero, digits, to_string) \
+#define ION_DECIMAL_TO_STRING_HELPER_BUILDER(is_signed, is_infinite, is_nan, is_zero, digits, to_string) \
     iENTER; \
     ASSERT(value); \
     BOOL is_negative = is_signed(value); \
@@ -198,17 +198,17 @@ void _ion_decimal_to_string_to_ion(char *p_string) {
     iRETURN; \
 
 iERR _ion_decimal_to_string_quad_helper(const decQuad *value, char *p_string) {
-    ION_DECIMAL_TO_STRING_HELPER(decQuadIsSigned, decQuadIsInfinite, decQuadIsNaN,
-                                 decQuadIsZero, decQuadDigits(value), decQuadToString);
+    ION_DECIMAL_TO_STRING_HELPER_BUILDER(decQuadIsSigned, decQuadIsInfinite, decQuadIsNaN,
+                                         decQuadIsZero, decQuadDigits(value), decQuadToString);
 }
 
 iERR _ion_decimal_to_string_number_helper(const decNumber *value, char *p_string) {
-    ION_DECIMAL_TO_STRING_HELPER(decNumberIsNegative, decNumberIsInfinite, decNumberIsNaN,
-                                 decNumberIsZero, value->digits, decNumberToString);
+    ION_DECIMAL_TO_STRING_HELPER_BUILDER(decNumberIsNegative, decNumberIsInfinite, decNumberIsNaN,
+                                         decNumberIsZero, value->digits, decNumberToString);
 }
 
 iERR ion_decimal_to_string(const ION_DECIMAL *value, char *p_string) {
-    ION_DECIMAL_API(
+    ION_DECIMAL_SWITCH(
         value,
         IONCHECK(_ion_decimal_to_string_quad_helper(quad_value, p_string)),
         IONCHECK(_ion_decimal_to_string_number_helper(num_value, p_string))
@@ -243,7 +243,7 @@ iERR ion_decimal_from_number(ION_DECIMAL *value, decNumber *number) {
     iRETURN;
 }
 
-#define ION_DECIMAL_CONVERSION_API(name, type, if_quad, if_number) \
+#define ION_DECIMAL_CONVERSION_API_BUILDER(name, type, if_quad, if_number) \
 iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
     iENTER; \
     uint32_t status; \
@@ -260,8 +260,8 @@ iERR name(const ION_DECIMAL *value, decContext *context, type *p_out) { \
     iRETURN; \
 }
 
-ION_DECIMAL_CONVERSION_API(ion_decimal_to_int32, int32_t, decQuadToInt32Exact, decNumberToInt32);
-ION_DECIMAL_CONVERSION_API(ion_decimal_to_uint32, uint32_t, decQuadToUInt32Exact, decNumberToUInt32);
+ION_DECIMAL_CONVERSION_API_BUILDER(ion_decimal_to_int32, int32_t, decQuadToInt32Exact, decNumberToInt32);
+ION_DECIMAL_CONVERSION_API_BUILDER(ion_decimal_to_uint32, uint32_t, decQuadToUInt32Exact, decNumberToUInt32);
 
 iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_INT *p_int) {
     iENTER;
@@ -279,7 +279,7 @@ iERR ion_decimal_to_ion_int(const ION_DECIMAL *value, decContext *context, ION_I
 }
 
 iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *p_int) {
-    ION_DECIMAL_API (
+    ION_DECIMAL_SWITCH (
         value,
         IONCHECK(ion_int_to_decimal(p_int, quad_value, context)),
         IONCHECK(_ion_int_to_decimal_number(p_int, num_value, context))
@@ -353,7 +353,10 @@ iERR ion_decimal_from_ion_int(ION_DECIMAL *value, decContext *context, ION_INT *
 
 #define ION_DECIMAL_DO_NOTHING /*nothing*/
 
-#define ION_DECIMAL_OVERFLOW_API_BUILDER(name, all_decnums_mask, api_params, calculate_quad, quad_args, calculate_decnum_mask, calculate_operand_mask, restore_quad, calculate_number, number_args, helper_params, standardize_operands, converted_args, helper_args) \
+#define ION_DECIMAL_OVERFLOW_API_BUILDER(name, all_decnums_mask, api_params, calculate_quad, quad_args, \
+                                         calculate_decnum_mask, calculate_operand_mask, restore_quad,  \
+                                         calculate_number, number_args, helper_params, standardize_operands, \
+                                         converted_args, helper_args) \
 iERR _##name##_standardized helper_params { \
     iENTER; \
     standardize_operands; \
@@ -407,7 +410,7 @@ iERR name api_params { \
     iRETURN; \
 }
 
-#define ION_DECIMAL_CALC_THREE_OP(name, calculate_quad, calculate_number) \
+#define ION_DECIMAL_COMPUTE_API_BUILDER_THREE_OPERAND(name, calculate_quad, calculate_number) \
     ION_DECIMAL_OVERFLOW_API_BUILDER ( \
         name, \
         /*all_decnums_mask=*/(ION_DECIMAL_LHS_BIT | ION_DECIMAL_RHS_BIT | ION_DECIMAL_FHS_BIT), \
@@ -425,7 +428,7 @@ iERR name api_params { \
         /*helper_args=*/(value, lhs, rhs, fhs, context, decnum_mask) \
     )
 
-#define ION_DECIMAL_CALC_TWO_OP(name, calculate_quad, calculate_number) \
+#define ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(name, calculate_quad, calculate_number) \
     ION_DECIMAL_OVERFLOW_API_BUILDER ( \
         name, \
         /*all_decnums_mask=*/(ION_DECIMAL_LHS_BIT | ION_DECIMAL_RHS_BIT), \
@@ -464,7 +467,7 @@ iERR name api_params { \
     iRETURN; \
 }
 
-#define ION_DECIMAL_CALC_ONE_OP(name, calculate_quad_func, calculate_number_func) \
+#define ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(name, calculate_quad_func, calculate_number_func) \
     ION_DECIMAL_BASIC_API_BUILDER( \
         name, \
         (ION_DECIMAL *value, const ION_DECIMAL *rhs, decContext *context), \
@@ -474,32 +477,32 @@ iERR name api_params { \
 
 /* Operator APIs (computational) */
 
-ION_DECIMAL_CALC_THREE_OP(ion_decimal_fma, decQuadFMA, decNumberFMA);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_add, decQuadAdd, decNumberAdd);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_and, decQuadAnd, decNumberAnd);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_divide, decQuadDivide, decNumberDivide);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_divide_integer, decQuadDivideInteger, decNumberDivideInteger);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_max, decQuadMax, decNumberMax);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_max_mag, decQuadMaxMag, decNumberMaxMag);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_min, decQuadMin, decNumberMin);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_min_mag, decQuadMinMag, decNumberMinMag);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_multiply, decQuadMultiply, decNumberMultiply);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_or, decQuadOr, decNumberOr);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_quantize, decQuadQuantize, decNumberQuantize);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_remainder, decQuadRemainder, decNumberRemainder);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_remainder_near, decQuadRemainderNear, decNumberRemainderNear);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_rotate, decQuadRotate, decNumberRotate);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_scaleb, decQuadScaleB, decNumberScaleB);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_shift, decQuadShift, decNumberShift);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_subtract, decQuadSubtract, decNumberSubtract);
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_xor, decQuadXor, decNumberXor);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_abs, decQuadAbs, decNumberAbs);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_invert, decQuadInvert, decNumberInvert);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_logb, decQuadLogB, decNumberLogB);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_minus, decQuadMinus, decNumberMinus);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_plus, decQuadPlus, decNumberPlus);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_reduce, decQuadReduce, decNumberReduce);
-ION_DECIMAL_CALC_ONE_OP(ion_decimal_to_integral_exact, decQuadToIntegralExact, decNumberToIntegralExact);
+ION_DECIMAL_COMPUTE_API_BUILDER_THREE_OPERAND(ion_decimal_fma, decQuadFMA, decNumberFMA);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_add, decQuadAdd, decNumberAdd);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_and, decQuadAnd, decNumberAnd);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_divide, decQuadDivide, decNumberDivide);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_divide_integer, decQuadDivideInteger, decNumberDivideInteger);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_max, decQuadMax, decNumberMax);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_max_mag, decQuadMaxMag, decNumberMaxMag);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_min, decQuadMin, decNumberMin);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_min_mag, decQuadMinMag, decNumberMinMag);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_multiply, decQuadMultiply, decNumberMultiply);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_or, decQuadOr, decNumberOr);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_quantize, decQuadQuantize, decNumberQuantize);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_remainder, decQuadRemainder, decNumberRemainder);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_remainder_near, decQuadRemainderNear, decNumberRemainderNear);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_rotate, decQuadRotate, decNumberRotate);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_scaleb, decQuadScaleB, decNumberScaleB);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_shift, decQuadShift, decNumberShift);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_subtract, decQuadSubtract, decNumberSubtract);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_xor, decQuadXor, decNumberXor);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_abs, decQuadAbs, decNumberAbs);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_invert, decQuadInvert, decNumberInvert);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_logb, decQuadLogB, decNumberLogB);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_minus, decQuadMinus, decNumberMinus);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_plus, decQuadPlus, decNumberPlus);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_reduce, decQuadReduce, decNumberReduce);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND(ion_decimal_to_integral_exact, decQuadToIntegralExact, decNumberToIntegralExact);
 
 ION_DECIMAL_BASIC_API_BUILDER( \
     ion_decimal_to_integral_value, \
@@ -510,33 +513,33 @@ ION_DECIMAL_BASIC_API_BUILDER( \
 
 /* Utility APIs (non-computational) */
 
-#define ION_DECIMAL_UTILITY_API(name, if_quad, if_number) \
+#define ION_DECIMAL_UTILITY_API_BUILDER(name, if_quad, if_number) \
 uint32_t name(const ION_DECIMAL *value) { \
-    ION_DECIMAL_API(value, return if_quad(quad_value), return if_number(num_value)); \
+    ION_DECIMAL_SWITCH(value, return if_quad(quad_value), return if_number(num_value)); \
 }
 
-ION_DECIMAL_UTILITY_API(ion_decimal_is_finite, decQuadIsFinite, decNumberIsFinite);
-ION_DECIMAL_UTILITY_API(ion_decimal_is_infinite, decQuadIsInfinite, decNumberIsInfinite);
-ION_DECIMAL_UTILITY_API(ion_decimal_is_nan, decQuadIsNaN, decNumberIsNaN);
-ION_DECIMAL_UTILITY_API(ion_decimal_is_negative, decQuadIsNegative, decNumberIsNegative);
-ION_DECIMAL_UTILITY_API(ion_decimal_is_zero, decQuadIsZero, decNumberIsZero);
-ION_DECIMAL_UTILITY_API(ion_decimal_is_canonical, decQuadIsCanonical, decNumberIsCanonical);
-ION_DECIMAL_UTILITY_API(ion_decimal_radix, decQuadRadix, decNumberRadix);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_finite, decQuadIsFinite, decNumberIsFinite);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_infinite, decQuadIsInfinite, decNumberIsInfinite);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_nan, decQuadIsNaN, decNumberIsNaN);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_negative, decQuadIsNegative, decNumberIsNegative);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_zero, decQuadIsZero, decNumberIsZero);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_is_canonical, decQuadIsCanonical, decNumberIsCanonical);
+ION_DECIMAL_UTILITY_API_BUILDER(ion_decimal_radix, decQuadRadix, decNumberRadix);
 
 uint32_t ion_decimal_is_normal(const ION_DECIMAL *value, decContext *context) {
-    ION_DECIMAL_API(value, return decQuadIsNormal(quad_value), return decNumberIsNormal(num_value, context));
+    ION_DECIMAL_SWITCH(value, return decQuadIsNormal(quad_value), return decNumberIsNormal(num_value, context));
 }
 
 uint32_t ion_decimal_is_subnormal(const ION_DECIMAL *value, decContext *context) {
-    ION_DECIMAL_API(value, return decQuadIsSubnormal(quad_value), return decNumberIsSubnormal(num_value, context));
+    ION_DECIMAL_SWITCH(value, return decQuadIsSubnormal(quad_value), return decNumberIsSubnormal(num_value, context));
 }
 
 int32_t ion_decimal_get_exponent(const ION_DECIMAL *value) {
-    ION_DECIMAL_API(value, return decQuadGetExponent(quad_value), return num_value->exponent);
+    ION_DECIMAL_SWITCH(value, return decQuadGetExponent(quad_value), return num_value->exponent);
 }
 
 uint32_t ion_decimal_digits(const ION_DECIMAL *value) {
-    ION_DECIMAL_API(value, return decQuadDigits(quad_value), return num_value->digits);
+    ION_DECIMAL_SWITCH(value, return decQuadDigits(quad_value), return num_value->digits);
 }
 
 uint32_t ion_decimal_same_quantum(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs) {
@@ -544,7 +547,7 @@ uint32_t ion_decimal_same_quantum(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs
 }
 
 uint32_t ion_decimal_is_integer(const ION_DECIMAL *value) {
-    ION_DECIMAL_API(value, return decQuadIsInteger(quad_value), return num_value->exponent == 0);
+    ION_DECIMAL_SWITCH(value, return decQuadIsInteger(quad_value), return num_value->exponent == 0);
 }
 
 /* Comparisons */
@@ -615,7 +618,7 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
 
 /* Copies */
 
-#define ION_DECIMAL_CALC_ONE_OP_NO_CONTEXT(name, calculate_quad_func, calculate_number_func) \
+#define ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND_NO_CONTEXT(name, calculate_quad_func, calculate_number_func) \
     ION_DECIMAL_BASIC_API_BUILDER( \
         name, \
         (ION_DECIMAL *value, const ION_DECIMAL *rhs), \
@@ -623,10 +626,10 @@ iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decCo
         calculate_number_func(ION_DECIMAL_AS_NUMBER(value), num_value) \
     );
 
-ION_DECIMAL_CALC_ONE_OP_NO_CONTEXT(ion_decimal_canonical, decQuadCanonical, decNumberCopy); /* decNumbers are always canonical. */
-ION_DECIMAL_CALC_ONE_OP_NO_CONTEXT(ion_decimal_copy, decQuadCopy, decNumberCopy);
-ION_DECIMAL_CALC_ONE_OP_NO_CONTEXT(ion_decimal_copy_abs, decQuadCopyAbs, decNumberCopyAbs);
-ION_DECIMAL_CALC_ONE_OP_NO_CONTEXT(ion_decimal_copy_negate, decQuadCopyNegate, decNumberCopyNegate);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND_NO_CONTEXT(ion_decimal_canonical, decQuadCanonical, decNumberCopy); /* decNumbers are always canonical. */
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND_NO_CONTEXT(ion_decimal_copy, decQuadCopy, decNumberCopy);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND_NO_CONTEXT(ion_decimal_copy_abs, decQuadCopyAbs, decNumberCopyAbs);
+ION_DECIMAL_COMPUTE_API_BUILDER_ONE_OPERAND_NO_CONTEXT(ion_decimal_copy_negate, decQuadCopyNegate, decNumberCopyNegate);
 
 void _decQuad_copy_sign_drop_context(decQuad *value, const decQuad *lhs, const decQuad *rhs, decContext *context) {
     decQuadCopySign(value, lhs, rhs);
@@ -636,4 +639,4 @@ void _decNumber_copy_sign_drop_context(decNumber *value, const decNumber *lhs, c
     decNumberCopySign(value, lhs, rhs);
 }
 
-ION_DECIMAL_CALC_TWO_OP(ion_decimal_copy_sign, _decQuad_copy_sign_drop_context, _decNumber_copy_sign_drop_context);
+ION_DECIMAL_COMPUTE_API_BUILDER_TWO_OPERAND(ion_decimal_copy_sign, _decQuad_copy_sign_drop_context, _decNumber_copy_sign_drop_context);
