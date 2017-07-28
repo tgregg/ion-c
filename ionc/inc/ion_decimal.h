@@ -244,6 +244,14 @@ ION_API_EXPORT uint32_t ion_decimal_is_canonical(const ION_DECIMAL *value);
 /* Comparisons */
 
 /**
+ * Compares ION_DECIMALs for ordering and equivalence under the Ion data model. A negative result indicates that `left`
+ * is less than `right`. A positive result indicates that `left` is greater than `right`. A result of zero indicates
+ * that `left` and `right` are equivalent under the Ion data model. Non-equivalent values are ordered according to the
+ * IEEE 754 total ordering.
+ */
+ION_API_EXPORT iERR ion_decimal_compare(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, int32_t *result);
+
+/**
  * Compares decQuads for equivalence under the Ion data model. That is, the sign, coefficient, and exponent must be
  * equivalent for the normalized values (even for zero).
  *

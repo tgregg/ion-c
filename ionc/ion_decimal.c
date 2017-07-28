@@ -549,51 +549,67 @@ uint32_t ion_decimal_is_integer(const ION_DECIMAL *value) {
 
 /* Comparisons */
 
-iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
+iERR _ion_decimal_compare_quad(const decQuad *left, const decQuad *right, decContext *context, int32_t *result) {
     iENTER;
     decQuad res;
     decQuadCompareTotal(&res, left, right);
-    *is_equal = !decQuadToInt32(&res, context, context->round);
+    *result = decQuadToInt32(&res, context, context->round);
     iRETURN;
 }
 
-iERR _ion_decimal_equals_number(const decNumber *left, const decNumber *right, decContext *context, BOOL *is_equal) {
+iERR _ion_decimal_compare_number(const decNumber *left, const decNumber *right, decContext *context, int32_t *result) {
     iENTER;
     decNumber res;
     decNumberCompareTotal(&res, left, right, context);
-    *is_equal = !decNumberToInt32(&res, context);
+    *result = decNumberToInt32(&res, context);
     iRETURN;
 }
 
-iERR _ion_decimal_equals_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, BOOL *is_equal) {
+iERR _ion_decimal_comare_helper(const ION_DECIMAL *lhs, const ION_DECIMAL *rhs, decContext *context, int32_t *result) {
     iENTER;
     int decnum_mask = (ION_DECIMAL_IS_NUMBER(lhs) ? ION_DECIMAL_LHS_BIT : 0) | (ION_DECIMAL_IS_NUMBER(rhs) ? ION_DECIMAL_RHS_BIT : 0);
     ION_DECIMAL_CONVERT_TWO_OPERAND;
-    IONCHECK(_ion_decimal_equals_number(op1, op2, context, is_equal));
+    IONCHECK(_ion_decimal_compare_number(op1, op2, context, result));
+    iRETURN;
+}
+
+iERR ion_decimal_compare(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, int32_t *result) {
+    iENTER;
+    ASSERT(result);
+    if (ION_DECIMAL_IS_NUMBER(left) ^ ION_DECIMAL_IS_NUMBER(right)) {
+        if (left->type == ION_DECIMAL_TYPE_UNKNOWN || right->type == ION_DECIMAL_TYPE_UNKNOWN) {
+            FAILWITH(IERR_INVALID_ARG);
+        }
+        IONCHECK(_ion_decimal_comare_helper(left, right, context, result));
+        SUCCEED();
+    }
+    switch (left->type) {
+        case ION_DECIMAL_TYPE_QUAD:
+            IONCHECK(_ion_decimal_compare_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, result));
+            break;
+        case ION_DECIMAL_TYPE_NUMBER_OWNED:
+        case ION_DECIMAL_TYPE_NUMBER:
+            IONCHECK(_ion_decimal_compare_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, result));
+            break;
+        default:
+        FAILWITH(IERR_INVALID_ARG);
+    }
+    iRETURN;
+}
+
+iERR ion_decimal_equals_quad(const decQuad *left, const decQuad *right, decContext *context, BOOL *is_equal) {
+    iENTER;
+    int32_t result;
+    IONCHECK(_ion_decimal_compare_quad(left, right, context, &result));
+    *is_equal = !result;
     iRETURN;
 }
 
 iERR ion_decimal_equals(const ION_DECIMAL *left, const ION_DECIMAL *right, decContext *context, BOOL *is_equal) {
     iENTER;
-    ASSERT(is_equal);
-    if (ION_DECIMAL_IS_NUMBER(left) ^ ION_DECIMAL_IS_NUMBER(right)) {
-        if (left->type == ION_DECIMAL_TYPE_UNKNOWN || right->type == ION_DECIMAL_TYPE_UNKNOWN) {
-            FAILWITH(IERR_INVALID_ARG);
-        }
-        IONCHECK(_ion_decimal_equals_helper(left, right, context, is_equal));
-        SUCCEED();
-    }
-    switch (left->type) {
-        case ION_DECIMAL_TYPE_QUAD:
-            IONCHECK(ion_decimal_equals_quad(ION_DECIMAL_AS_QUAD(left), ION_DECIMAL_AS_QUAD(right), context, is_equal));
-            break;
-        case ION_DECIMAL_TYPE_NUMBER_OWNED:
-        case ION_DECIMAL_TYPE_NUMBER:
-            IONCHECK(_ion_decimal_equals_number(ION_DECIMAL_AS_NUMBER(left), ION_DECIMAL_AS_NUMBER(right), context, is_equal));
-            break;
-        default:
-            FAILWITH(IERR_INVALID_ARG);
-    }
+    int32_t result;
+    IONCHECK(ion_decimal_compare(left, right, context, &result));
+    *is_equal = !result;
     iRETURN;
 }
 
