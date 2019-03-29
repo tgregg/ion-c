@@ -19,5 +19,6 @@ add_subdirectory(decNumber)
 add_subdirectory(ionc)
 add_subdirectory(test)
 add_subdirectory(tools)
+add_subdirectory(benchmark)
 
 export(PACKAGE IonC)
